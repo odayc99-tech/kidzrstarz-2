@@ -1,0 +1,9 @@
+{
+  "query": "CREATE TABLE `images` (\n\t`id` int AUTO_INCREMENT NOT NULL,\n\t`orderId` int NOT NULL,\n\t`imageKey` varchar(512) NOT NULL,\n\t`imageUrl` text NOT NULL,\n\t`mimeType` varchar(50) NOT NULL DEFAULT 'image/png',\n\t`fileSize` int,\n\t`generationModel` varchar(100) NOT NULL DEFAULT 'pixar-3d',\n\t`createdAt` timestamp NOT NULL DEFAULT (now()),\n\tCONSTRAINT `images_id` PRIMARY KEY(`id`)\n);",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway05.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2ngM8wFkA348DwV.d038836586ef --database LzCHneSJWfHsfEKists2Bj --execute CREATE TABLE `images` (\n\t`id` int AUTO_INCREMENT NOT NULL,\n\t`orderId` int NOT NULL,\n\t`imageKey` varchar(512) NOT NULL,\n\t`imageUrl` text NOT NULL,\n\t`mimeType` varchar(50) NOT NULL DEFAULT 'image/png',\n\t`fileSize` int,\n\t`generationModel` varchar(100) NOT NULL DEFAULT 'pixar-3d',\n\t`createdAt` timestamp NOT NULL DEFAULT (now()),\n\tCONSTRAINT `images_id` PRIMARY KEY(`id`)\n);",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 605
+}

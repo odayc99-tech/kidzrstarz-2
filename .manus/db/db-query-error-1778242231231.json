@@ -1,0 +1,8 @@
+{
+  "query": "SELECT ss.orderId, ss.sceneIndex, ss.status, LEFT(ss.illustrationUrl, 150) as illUrl, LEFT(ss.narrationUrl, 100) as narUrl FROM story_scenes ss WHERE ss.orderId IN (510001, 480001, 450001) ORDER BY ss.orderId, ss.sceneIndex LIMIT 20;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway05.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2ngM8wFkA348DwV.d038836586ef --database LzCHneSJWfHsfEKists2Bj --execute SELECT ss.orderId, ss.sceneIndex, ss.status, LEFT(ss.illustrationUrl, 150) as illUrl, LEFT(ss.narrationUrl, 100) as narUrl FROM story_scenes ss WHERE ss.orderId IN (510001, 480001, 450001) ORDER BY ss.orderId, ss.sceneIndex LIMIT 20;",
+  "returncode": 1,
+  "logs": [
+    "ERROR 1146 (42S02) at line 1: Table 'lzchnesjwfhsfekists2bj.story_scenes' doesn't exist"
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "query": "UPDATE storyScenes SET illustrationUrl = CONCAT('https://kidzrstarz-upload.s3.us-east-2.amazonaws.com/', illustrationKey) WHERE illustrationKey IS NOT NULL AND illustrationKey != '';",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway05.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2ngM8wFkA348DwV.d038836586ef --database LzCHneSJWfHsfEKists2Bj --execute UPDATE storyScenes SET illustrationUrl = CONCAT('https://kidzrstarz-upload.s3.us-east-2.amazonaws.com/', illustrationKey) WHERE illustrationKey IS NOT NULL AND illustrationKey != '';",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 275
+}

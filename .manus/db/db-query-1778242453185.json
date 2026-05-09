@@ -1,0 +1,77 @@
+{
+  "query": "SELECT id, childName, status, errorMessage FROM orders WHERE paymentStatus = 'paid' AND videoKey IS NULL AND errorMessage LIKE '%Video generation failed%' ORDER BY id DESC LIMIT 10;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway05.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2ngM8wFkA348DwV.d038836586ef --database LzCHneSJWfHsfEKists2Bj --execute SELECT id, childName, status, errorMessage FROM orders WHERE paymentStatus = 'paid' AND videoKey IS NULL AND errorMessage LIKE '%Video generation failed%' ORDER BY id DESC LIMIT 10;",
+  "rows": [
+    {
+      "id": "480001",
+      "childName": "Charlotte",
+      "status": "completed",
+      "errorMessage": "Video generation failed: ffmpeg failed (exit null):     0KiB time=N/A bitrate=N/A speed=N/A    "
+    },
+    {
+      "id": "450003",
+      "childName": "nora",
+      "status": "completed",
+      "errorMessage": "Video generation failed: ffmpeg failed (exit null):     0KiB time=N/A bitrate=N/A speed=N/A    "
+    },
+    {
+      "id": "420002",
+      "childName": "nora",
+      "status": "completed",
+      "errorMessage": "Video generation failed: Failed to download https://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360042/scenes/cEr1xEIqMCY5EhsoxURD3-scene-0.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=AKIA4PL2I6HA7U3UJRE3%2F20260507%2Fus-east-2%2Fs3%2Faws4_request&X-Amz-Date=20260507T222624Z&X-Amz-Expires=3600&X-Amz-Signature=2cdabe2314962967184eed1b928d41d043a155f337d8b3c741954beecb231222&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject: 403"
+    },
+    {
+      "id": "420001",
+      "childName": "lucy",
+      "status": "completed",
+      "errorMessage": "Video generation failed: Failed to download https://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360042/scenes/MdRILJPy3AWKibDmBA9HV-scene-0.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=AKIA4PL2I6HA7U3UJRE3%2F20260507%2Fus-east-2%2Fs3%2Faws4_request&X-Amz-Date=20260507T214331Z&X-Amz-Expires=3600&X-Amz-Signature=e99948a2e4467cf776c15bdf3e18ece349183c38cbf8ad4a0b35935dd6833d80&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject: 403"
+    },
+    {
+      "id": "360006",
+      "childName": "nora",
+      "status": "completed",
+      "errorMessage": "Video generation failed: Failed to download https://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360042/scenes/JXgSq4TaR0_8rpcdsMgy0-scene-0.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=AKIA4PL2I6HA7U3UJRE3%2F20260507%2Fus-east-2%2Fs3%2Faws4_request&X-Amz-Date=20260507T015247Z&X-Amz-Expires=3600&X-Amz-Signature=8e96c856f2d9aed5a86fb874e3d037a3afac1b426d9acbc99dc1dca544390c1d&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject: 403"
+    },
+    {
+      "id": "360005",
+      "childName": "Charlotte",
+      "status": "completed",
+      "errorMessage": "Video generation failed: Failed to download https://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360042/scenes/pTG6W-iIXojxixPk7IVGu-scene-0.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=AKIA4PL2I6HA7U3UJRE3%2F20260507%2Fus-east-2%2Fs3%2Faws4_request&X-Amz-Date=20260507T011302Z&X-Amz-Expires=3600&X-Amz-Signature=48ac98d6c718183f512901e93ef8ed309990d19ac4bed90a60b83508f076b517&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject: 403"
+    },
+    {
+      "id": "360004",
+      "childName": "nora",
+      "status": "processing",
+      "errorMessage": "Video generation failed: Failed to download https://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360042/scenes/WNlh00EB2qFXL08mPgIx4-scene-0.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=AKIA4PL2I6HA7U3UJRE3%2F20260507%2Fus-east-2%2Fs3%2Faws4_request&X-Amz-Date=20260507T004744Z&X-Amz-Expires=3600&X-Amz-Signature=fdc456d49bda3cf1b649772bebc680228c320019b4ead3951be5ba23eff98b7f&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject: 403"
+    },
+    {
+      "id": "360002",
+      "childName": "nora",
+      "status": "completed",
+      "errorMessage": "Video generation failed: Failed to download https://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360042/scenes/3SBAJMiCxjMp0m3EaneRg-scene-0.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=AKIA4PL2I6HA7U3UJRE3%2F20260506%2Fus-east-2%2Fs3%2Faws4_request&X-Amz-Date=20260506T233811Z&X-Amz-Expires=3600&X-Amz-Signature=28f10dfa44e445126752029d3e21eef6932ab1bc7eb5c0da5f5e605a86f2fcad&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject: 403"
+    },
+    {
+      "id": "360001",
+      "childName": "nora",
+      "status": "completed",
+      "errorMessage": "Video generation failed: ffmpeg failed (exit 234): g requested, but no decoder found for: png"
+    },
+    {
+      "id": "330001",
+      "childName": "nora",
+      "status": "completed",
+      "errorMessage": "Video generation failed: Failed to download https://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360042/scenes/oiDzIQhEzDrnjBpgObRM5-scene-0.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=AKIA4PL2I6HA7U3UJRE3%2F20260506%2Fus-east-2%2Fs3%2Faws4_request&X-Amz-Date=20260506T212931Z&X-Amz-Expires=3600&X-Amz-Signature=56273f54209c717f13f51301a433105c08964864bcc3006a47aa6e0e4932719e&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject: 403"
+    }
+  ],
+  "messages": [
+    "frame=    0 fps=0.0 q=0.0 size=       0KiB time=N/A bitrate=N/A speed=N/A    ",
+    "frame=    0 fps=0.0 q=0.0 size=       0KiB time=N/A bitrate=N/A speed=N/A    ",
+    "frame=    0 fps=0.0 q=0.0 size=       0KiB time=N/A bitrate=N/A speed=N/A    ",
+    "frame=    0 fps=0.0 q=0.0 size=       0KiB time=N/A bitrate=N/A speed=N/A    ",
+    "[fc#0 @ 0x7f934dbe3080] Error binding an input stream to complex filtergraph input scale:default.",
+    "Error binding filtergraph inputs/outputs: Invalid argument"
+  ],
+  "stdout": "id\tchildName\tstatus\terrorMessage\n480001\tCharlotte\tcompleted\tVideo generation failed: ffmpeg failed (exit null):     0KiB time=N/A bitrate=N/A speed=N/A    \nframe=    0 fps=0.0 q=0.0 size=       0KiB time=N/A bitrate=N/A speed=N/A    \nframe=    0 fps=0.0 q=0.0 size=       0KiB time=N/A bitrate=N/A speed=N/A    \n450003\tnora\tcompleted\tVideo generation failed: ffmpeg failed (exit null):     0KiB time=N/A bitrate=N/A speed=N/A    \nframe=    0 fps=0.0 q=0.0 size=       0KiB time=N/A bitrate=N/A speed=N/A    \nframe=    0 fps=0.0 q=0.0 size=       0KiB time=N/A bitrate=N/A speed=N/A    \n420002\tnora\tcompleted\tVideo generation failed: Failed to download https://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360042/scenes/cEr1xEIqMCY5EhsoxURD3-scene-0.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=AKIA4PL2I6HA7U3UJRE3%2F20260507%2Fus-east-2%2Fs3%2Faws4_request&X-Amz-Date=20260507T222624Z&X-Amz-Expires=3600&X-Amz-Signature=2cdabe2314962967184eed1b928d41d043a155f337d8b3c741954beecb231222&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject: 403\n420001\tlucy\tcompleted\tVideo generation failed: Failed to download https://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360042/scenes/MdRILJPy3AWKibDmBA9HV-scene-0.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=AKIA4PL2I6HA7U3UJRE3%2F20260507%2Fus-east-2%2Fs3%2Faws4_request&X-Amz-Date=20260507T214331Z&X-Amz-Expires=3600&X-Amz-Signature=e99948a2e4467cf776c15bdf3e18ece349183c38cbf8ad4a0b35935dd6833d80&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject: 403\n360006\tnora\tcompleted\tVideo generation failed: Failed to download https://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360042/scenes/JXgSq4TaR0_8rpcdsMgy0-scene-0.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=AKIA4PL2I6HA7U3UJRE3%2F20260507%2Fus-east-2%2Fs3%2Faws4_request&X-Amz-Date=20260507T015247Z&X-Amz-Expires=3600&X-Amz-Signature=8e96c856f2d9aed5a86fb874e3d037a3afac1b426d9acbc99dc1dca544390c1d&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject: 403\n360005\tCharlotte\tcompleted\tVideo generation failed: Failed to download https://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360042/scenes/pTG6W-iIXojxixPk7IVGu-scene-0.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=AKIA4PL2I6HA7U3UJRE3%2F20260507%2Fus-east-2%2Fs3%2Faws4_request&X-Amz-Date=20260507T011302Z&X-Amz-Expires=3600&X-Amz-Signature=48ac98d6c718183f512901e93ef8ed309990d19ac4bed90a60b83508f076b517&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject: 403\n360004\tnora\tprocessing\tVideo generation failed: Failed to download https://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360042/scenes/WNlh00EB2qFXL08mPgIx4-scene-0.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=AKIA4PL2I6HA7U3UJRE3%2F20260507%2Fus-east-2%2Fs3%2Faws4_request&X-Amz-Date=20260507T004744Z&X-Amz-Expires=3600&X-Amz-Signature=fdc456d49bda3cf1b649772bebc680228c320019b4ead3951be5ba23eff98b7f&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject: 403\n360002\tnora\tcompleted\tVideo generation failed: Failed to download https://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360042/scenes/3SBAJMiCxjMp0m3EaneRg-scene-0.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=AKIA4PL2I6HA7U3UJRE3%2F20260506%2Fus-east-2%2Fs3%2Faws4_request&X-Amz-Date=20260506T233811Z&X-Amz-Expires=3600&X-Amz-Signature=28f10dfa44e445126752029d3e21eef6932ab1bc7eb5c0da5f5e605a86f2fcad&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject: 403\n360001\tnora\tcompleted\tVideo generation failed: ffmpeg failed (exit 234): g requested, but no decoder found for: png\n[fc#0 @ 0x7f934dbe3080] Error binding an input stream to complex filtergraph input scale:default.\nError binding filtergraph inputs/outputs: Invalid argument\n\n330001\tnora\tcompleted\tVideo generation failed: Failed to download https://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360042/scenes/oiDzIQhEzDrnjBpgObRM5-scene-0.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=AKIA4PL2I6HA7U3UJRE3%2F20260506%2Fus-east-2%2Fs3%2Faws4_request&X-Amz-Date=20260506T212931Z&X-Amz-Expires=3600&X-Amz-Signature=56273f54209c717f13f51301a433105c08964864bcc3006a47aa6e0e4932719e&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject: 403\n",
+  "stderr": "",
+  "execution_time_ms": 380
+}

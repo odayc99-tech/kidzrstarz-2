@@ -1,0 +1,16 @@
+{
+  "query": "\n-- First, see how many orders need backfilling\nSELECT id, childName, videoKey, LEFT(videoUrl, 80) as videoUrl_preview\nFROM orders\nWHERE videoKey IS NOT NULL AND videoKey != ''\nORDER BY id DESC\nLIMIT 20;\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway05.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2ngM8wFkA348DwV.d038836586ef --database LzCHneSJWfHsfEKists2Bj --execute \n-- First, see how many orders need backfilling\nSELECT id, childName, videoKey, LEFT(videoUrl, 80) as videoUrl_preview\nFROM orders\nWHERE videoKey IS NOT NULL AND videoKey != ''\nORDER BY id DESC\nLIMIT 20;\n",
+  "rows": [
+    {
+      "id": "30001",
+      "childName": "nora",
+      "videoKey": "1/videos/jNKEawVGTdpO9Gb0L0EQb-storybook.mp4",
+      "videoUrl_preview": "https://d2xsxph8kpxj0f.cloudfront.net/310519663593203751/LzCHneSJWfHsfEKists2Bj/"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tchildName\tvideoKey\tvideoUrl_preview\n30001\tnora\t1/videos/jNKEawVGTdpO9Gb0L0EQb-storybook.mp4\thttps://d2xsxph8kpxj0f.cloudfront.net/310519663593203751/LzCHneSJWfHsfEKists2Bj/\n",
+  "stderr": "",
+  "execution_time_ms": 291
+}

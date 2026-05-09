@@ -1,0 +1,115 @@
+{
+  "query": "SELECT ss.orderId, ss.sceneIndex, ss.status, LEFT(ss.illustrationUrl, 150) as illUrl, LEFT(ss.narrationUrl, 100) as narUrl FROM storyScenes ss WHERE ss.orderId IN (510001, 480001, 450001) ORDER BY ss.orderId, ss.sceneIndex LIMIT 20;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway05.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2ngM8wFkA348DwV.d038836586ef --database LzCHneSJWfHsfEKists2Bj --execute SELECT ss.orderId, ss.sceneIndex, ss.status, LEFT(ss.illustrationUrl, 150) as illUrl, LEFT(ss.narrationUrl, 100) as narUrl FROM storyScenes ss WHERE ss.orderId IN (510001, 480001, 450001) ORDER BY ss.orderId, ss.sceneIndex LIMIT 20;",
+  "rows": [
+    {
+      "orderId": "450001",
+      "sceneIndex": "0",
+      "status": "completed",
+      "illUrl": "https://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360042/scenes/0LcvgfIaV6XU2bBDAIxYH-scene-0.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sh",
+      "narUrl": "https://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360042/narration/uaL59uz7PDwdQp9P8-QD8-edge-nar"
+    },
+    {
+      "orderId": "450001",
+      "sceneIndex": "1",
+      "status": "completed",
+      "illUrl": "https://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360042/scenes/RUwWCrvuXw9uyPc9CaV27-scene-1.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sh",
+      "narUrl": "https://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360042/narration/lCmA4jvRHVTI7hZ1LkRyn-edge-nar"
+    },
+    {
+      "orderId": "450001",
+      "sceneIndex": "2",
+      "status": "completed",
+      "illUrl": "https://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360042/scenes/OK9lg7C5oI7QSzsyycEwf-scene-2.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sh",
+      "narUrl": "https://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360042/narration/xyffSrP589cY06TwCbCXN-edge-nar"
+    },
+    {
+      "orderId": "450001",
+      "sceneIndex": "3",
+      "status": "completed",
+      "illUrl": "https://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360042/scenes/a_7V4vL15d4qeqGd_kIwp-scene-3.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sh",
+      "narUrl": "https://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360042/narration/yXJItTlcrR4GN4RG0AkWx-edge-nar"
+    },
+    {
+      "orderId": "450001",
+      "sceneIndex": "4",
+      "status": "completed",
+      "illUrl": "https://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360042/scenes/9PKiFEqyE7xgnuFoosHGd-scene-4.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sh",
+      "narUrl": "https://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360042/narration/KZS4l5Ing8lzy--VEuYFQ-edge-nar"
+    },
+    {
+      "orderId": "480001",
+      "sceneIndex": "0",
+      "status": "completed",
+      "illUrl": "https://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360042/scenes/XSzVq0t-3PNwEXvFaTve_-scene-0.png",
+      "narUrl": "https://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360042/narration/l__QUsaT1fqQ0POd-_tRj-edge-nar"
+    },
+    {
+      "orderId": "480001",
+      "sceneIndex": "1",
+      "status": "completed",
+      "illUrl": "https://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360042/scenes/fOJAimOHSgEBJpENBOc81-scene-1.png",
+      "narUrl": "https://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360042/narration/gpHG84YM2V70fAjLmagnH-edge-nar"
+    },
+    {
+      "orderId": "480001",
+      "sceneIndex": "2",
+      "status": "completed",
+      "illUrl": "https://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360042/scenes/ekUfCTOFNsSGph6-2ZvDG-scene-2.png",
+      "narUrl": "https://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360042/narration/jwCXbwy2NSwnszf4Hbbqx-edge-nar"
+    },
+    {
+      "orderId": "480001",
+      "sceneIndex": "3",
+      "status": "completed",
+      "illUrl": "https://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360042/scenes/9TCjdcdw3akmXHeJvcH88-scene-3.png",
+      "narUrl": "https://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360042/narration/aPofmYAmWLdHN4yyVzfVL-edge-nar"
+    },
+    {
+      "orderId": "480001",
+      "sceneIndex": "4",
+      "status": "completed",
+      "illUrl": "https://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360042/scenes/EO5KT4ylw0SPp7fbs2Qv5-scene-4.png",
+      "narUrl": "https://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360042/narration/6iGe_U4Ufw8o749Tr6KcH-edge-nar"
+    },
+    {
+      "orderId": "510001",
+      "sceneIndex": "0",
+      "status": "completed",
+      "illUrl": "https://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360042/scenes/uUHuQzwQ0CmMSkBcGMhF_-scene-0.png",
+      "narUrl": "https://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360042/narration/YhapHJlBJArNy-6iE86cA-edge-nar"
+    },
+    {
+      "orderId": "510001",
+      "sceneIndex": "1",
+      "status": "completed",
+      "illUrl": "https://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360042/scenes/6z-V-pKv7GRvT17dGc-Qz-scene-1.png",
+      "narUrl": "https://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360042/narration/8aH2jIGGG1uBv2CoY_fbH-edge-nar"
+    },
+    {
+      "orderId": "510001",
+      "sceneIndex": "2",
+      "status": "completed",
+      "illUrl": "https://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360042/scenes/Mxk06vvZOD-nT_5epAaA4-scene-2.png",
+      "narUrl": "https://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360042/narration/XzWdm5ZaCVv1tOVZ4glcH-edge-nar"
+    },
+    {
+      "orderId": "510001",
+      "sceneIndex": "3",
+      "status": "completed",
+      "illUrl": "https://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360042/scenes/G5ZCw7Ahwc1xlaLU2tOA0-scene-3.png",
+      "narUrl": "https://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360042/narration/TOei5G9CqgLKRijG1ut6p-edge-nar"
+    },
+    {
+      "orderId": "510001",
+      "sceneIndex": "4",
+      "status": "completed",
+      "illUrl": "https://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360042/scenes/2qX54ZzFuTlKcKessmkOc-scene-4.png",
+      "narUrl": "https://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360042/narration/Yt4LoYXlrH6z9g2-sHSUb-edge-nar"
+    }
+  ],
+  "messages": [],
+  "stdout": "orderId\tsceneIndex\tstatus\tillUrl\tnarUrl\n450001\t0\tcompleted\thttps://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360042/scenes/0LcvgfIaV6XU2bBDAIxYH-scene-0.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sh\thttps://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360042/narration/uaL59uz7PDwdQp9P8-QD8-edge-nar\n450001\t1\tcompleted\thttps://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360042/scenes/RUwWCrvuXw9uyPc9CaV27-scene-1.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sh\thttps://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360042/narration/lCmA4jvRHVTI7hZ1LkRyn-edge-nar\n450001\t2\tcompleted\thttps://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360042/scenes/OK9lg7C5oI7QSzsyycEwf-scene-2.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sh\thttps://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360042/narration/xyffSrP589cY06TwCbCXN-edge-nar\n450001\t3\tcompleted\thttps://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360042/scenes/a_7V4vL15d4qeqGd_kIwp-scene-3.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sh\thttps://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360042/narration/yXJItTlcrR4GN4RG0AkWx-edge-nar\n450001\t4\tcompleted\thttps://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360042/scenes/9PKiFEqyE7xgnuFoosHGd-scene-4.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sh\thttps://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360042/narration/KZS4l5Ing8lzy--VEuYFQ-edge-nar\n480001\t0\tcompleted\thttps://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360042/scenes/XSzVq0t-3PNwEXvFaTve_-scene-0.png\thttps://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360042/narration/l__QUsaT1fqQ0POd-_tRj-edge-nar\n480001\t1\tcompleted\thttps://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360042/scenes/fOJAimOHSgEBJpENBOc81-scene-1.png\thttps://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360042/narration/gpHG84YM2V70fAjLmagnH-edge-nar\n480001\t2\tcompleted\thttps://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360042/scenes/ekUfCTOFNsSGph6-2ZvDG-scene-2.png\thttps://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360042/narration/jwCXbwy2NSwnszf4Hbbqx-edge-nar\n480001\t3\tcompleted\thttps://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360042/scenes/9TCjdcdw3akmXHeJvcH88-scene-3.png\thttps://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360042/narration/aPofmYAmWLdHN4yyVzfVL-edge-nar\n480001\t4\tcompleted\thttps://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360042/scenes/EO5KT4ylw0SPp7fbs2Qv5-scene-4.png\thttps://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360042/narration/6iGe_U4Ufw8o749Tr6KcH-edge-nar\n510001\t0\tcompleted\thttps://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360042/scenes/uUHuQzwQ0CmMSkBcGMhF_-scene-0.png\thttps://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360042/narration/YhapHJlBJArNy-6iE86cA-edge-nar\n510001\t1\tcompleted\thttps://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360042/scenes/6z-V-pKv7GRvT17dGc-Qz-scene-1.png\thttps://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360042/narration/8aH2jIGGG1uBv2CoY_fbH-edge-nar\n510001\t2\tcompleted\thttps://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360042/scenes/Mxk06vvZOD-nT_5epAaA4-scene-2.png\thttps://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360042/narration/XzWdm5ZaCVv1tOVZ4glcH-edge-nar\n510001\t3\tcompleted\thttps://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360042/scenes/G5ZCw7Ahwc1xlaLU2tOA0-scene-3.png\thttps://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360042/narration/TOei5G9CqgLKRijG1ut6p-edge-nar\n510001\t4\tcompleted\thttps://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360042/scenes/2qX54ZzFuTlKcKessmkOc-scene-4.png\thttps://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360042/narration/Yt4LoYXlrH6z9g2-sHSUb-edge-nar\n",
+  "stderr": "",
+  "execution_time_ms": 264
+}

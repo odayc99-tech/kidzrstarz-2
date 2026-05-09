@@ -1,0 +1,15 @@
+{
+  "query": "SELECT COUNT(*) as total_scenes, SUM(CASE WHEN illustrationKey IS NOT NULL THEN 1 ELSE 0 END) as has_key, SUM(CASE WHEN illustrationUrl LIKE '%X-Amz-Algorithm%' THEN 1 ELSE 0 END) as expired_presigned FROM storyScenes;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway05.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2ngM8wFkA348DwV.d038836586ef --database LzCHneSJWfHsfEKists2Bj --execute SELECT COUNT(*) as total_scenes, SUM(CASE WHEN illustrationKey IS NOT NULL THEN 1 ELSE 0 END) as has_key, SUM(CASE WHEN illustrationUrl LIKE '%X-Amz-Algorithm%' THEN 1 ELSE 0 END) as expired_presigned FROM storyScenes;",
+  "rows": [
+    {
+      "total_scenes": "96",
+      "has_key": "94",
+      "expired_presigned": "75"
+    }
+  ],
+  "messages": [],
+  "stdout": "total_scenes\thas_key\texpired_presigned\n96\t94\t75\n",
+  "stderr": "",
+  "execution_time_ms": 260
+}

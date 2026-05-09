@@ -1,0 +1,150 @@
+{
+  "query": "SELECT id, childName, status, paymentStatus, videoKey, LEFT(videoUrl, 80) as videoUrl_preview, LEFT(errorMessage, 100) as error FROM orders WHERE paymentStatus = 'paid' ORDER BY id DESC LIMIT 15;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway05.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2ngM8wFkA348DwV.d038836586ef --database LzCHneSJWfHsfEKists2Bj --execute SELECT id, childName, status, paymentStatus, videoKey, LEFT(videoUrl, 80) as videoUrl_preview, LEFT(errorMessage, 100) as error FROM orders WHERE paymentStatus = 'paid' ORDER BY id DESC LIMIT 15;",
+  "rows": [
+    {
+      "id": "510001",
+      "childName": "Charlotte",
+      "status": "completed",
+      "paymentStatus": "paid",
+      "videoKey": "NULL",
+      "videoUrl_preview": "NULL",
+      "error": "NULL"
+    },
+    {
+      "id": "480001",
+      "childName": "Charlotte",
+      "status": "completed",
+      "paymentStatus": "paid",
+      "videoKey": "NULL",
+      "videoUrl_preview": "NULL",
+      "error": "Video generation failed: ffmpeg failed (exit null):     0KiB time=N/A bitrate=N/A speed=N/A    "
+    },
+    {
+      "id": "450003",
+      "childName": "nora",
+      "status": "completed",
+      "paymentStatus": "paid",
+      "videoKey": "NULL",
+      "videoUrl_preview": "NULL",
+      "error": "Video generation failed: ffmpeg failed (exit null):     0KiB time=N/A bitrate=N/A speed=N/A    "
+    },
+    {
+      "id": "450001",
+      "childName": "nora-download",
+      "status": "completed",
+      "paymentStatus": "paid",
+      "videoKey": "NULL",
+      "videoUrl_preview": "NULL",
+      "error": "NULL"
+    },
+    {
+      "id": "420002",
+      "childName": "nora",
+      "status": "completed",
+      "paymentStatus": "paid",
+      "videoKey": "NULL",
+      "videoUrl_preview": "NULL",
+      "error": "Video generation failed: Failed to download https://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360"
+    },
+    {
+      "id": "420001",
+      "childName": "lucy",
+      "status": "completed",
+      "paymentStatus": "paid",
+      "videoKey": "NULL",
+      "videoUrl_preview": "NULL",
+      "error": "Video generation failed: Failed to download https://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360"
+    },
+    {
+      "id": "360006",
+      "childName": "nora",
+      "status": "completed",
+      "paymentStatus": "paid",
+      "videoKey": "NULL",
+      "videoUrl_preview": "NULL",
+      "error": "Video generation failed: Failed to download https://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360"
+    },
+    {
+      "id": "360005",
+      "childName": "Charlotte",
+      "status": "completed",
+      "paymentStatus": "paid",
+      "videoKey": "NULL",
+      "videoUrl_preview": "NULL",
+      "error": "Video generation failed: Failed to download https://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360"
+    },
+    {
+      "id": "360004",
+      "childName": "nora",
+      "status": "processing",
+      "paymentStatus": "paid",
+      "videoKey": "NULL",
+      "videoUrl_preview": "NULL",
+      "error": "Video generation failed: Failed to download https://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360"
+    },
+    {
+      "id": "360002",
+      "childName": "nora",
+      "status": "completed",
+      "paymentStatus": "paid",
+      "videoKey": "NULL",
+      "videoUrl_preview": "NULL",
+      "error": "Video generation failed: Failed to download https://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360"
+    },
+    {
+      "id": "360001",
+      "childName": "nora",
+      "status": "completed",
+      "paymentStatus": "paid",
+      "videoKey": "NULL",
+      "videoUrl_preview": "NULL",
+      "error": "Video generation failed: ffmpeg failed (exit 234): g requested, but no decoder found for: png"
+    },
+    {
+      "id": "330001",
+      "childName": "nora",
+      "status": "completed",
+      "paymentStatus": "paid",
+      "videoKey": "NULL",
+      "videoUrl_preview": "NULL",
+      "error": "Video generation failed: Failed to download https://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360"
+    },
+    {
+      "id": "300001",
+      "childName": "Charlotte",
+      "status": "completed",
+      "paymentStatus": "paid",
+      "videoKey": "NULL",
+      "videoUrl_preview": "NULL",
+      "error": "Video generation failed: [VideoCompose] Failed to download static ffmpeg: Error: spawnSync /bin/sh E"
+    },
+    {
+      "id": "270004",
+      "childName": "Charlotte",
+      "status": "completed",
+      "paymentStatus": "paid",
+      "videoKey": "NULL",
+      "videoUrl_preview": "NULL",
+      "error": "Video generation failed: Failed to download https://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360"
+    },
+    {
+      "id": "270003",
+      "childName": "nora",
+      "status": "completed",
+      "paymentStatus": "paid",
+      "videoKey": "NULL",
+      "videoUrl_preview": "NULL",
+      "error": "Video generation failed: ffmpeg failed (exit 234): g requested, but no decoder found for: png"
+    }
+  ],
+  "messages": [
+    "fram",
+    "fram",
+    "[fc#0 ",
+    "[fc#0 "
+  ],
+  "stdout": "id\tchildName\tstatus\tpaymentStatus\tvideoKey\tvideoUrl_preview\terror\n510001\tCharlotte\tcompleted\tpaid\tNULL\tNULL\tNULL\n480001\tCharlotte\tcompleted\tpaid\tNULL\tNULL\tVideo generation failed: ffmpeg failed (exit null):     0KiB time=N/A bitrate=N/A speed=N/A    \nfram\n450003\tnora\tcompleted\tpaid\tNULL\tNULL\tVideo generation failed: ffmpeg failed (exit null):     0KiB time=N/A bitrate=N/A speed=N/A    \nfram\n450001\tnora-download\tcompleted\tpaid\tNULL\tNULL\tNULL\n420002\tnora\tcompleted\tpaid\tNULL\tNULL\tVideo generation failed: Failed to download https://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360\n420001\tlucy\tcompleted\tpaid\tNULL\tNULL\tVideo generation failed: Failed to download https://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360\n360006\tnora\tcompleted\tpaid\tNULL\tNULL\tVideo generation failed: Failed to download https://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360\n360005\tCharlotte\tcompleted\tpaid\tNULL\tNULL\tVideo generation failed: Failed to download https://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360\n360004\tnora\tprocessing\tpaid\tNULL\tNULL\tVideo generation failed: Failed to download https://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360\n360002\tnora\tcompleted\tpaid\tNULL\tNULL\tVideo generation failed: Failed to download https://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360\n360001\tnora\tcompleted\tpaid\tNULL\tNULL\tVideo generation failed: ffmpeg failed (exit 234): g requested, but no decoder found for: png\n[fc#0 \n330001\tnora\tcompleted\tpaid\tNULL\tNULL\tVideo generation failed: Failed to download https://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360\n300001\tCharlotte\tcompleted\tpaid\tNULL\tNULL\tVideo generation failed: [VideoCompose] Failed to download static ffmpeg: Error: spawnSync /bin/sh E\n270004\tCharlotte\tcompleted\tpaid\tNULL\tNULL\tVideo generation failed: Failed to download https://kidzrstarz-upload.s3.us-east-2.amazonaws.com/360\n270003\tnora\tcompleted\tpaid\tNULL\tNULL\tVideo generation failed: ffmpeg failed (exit 234): g requested, but no decoder found for: png\n[fc#0 \n",
+  "stderr": "",
+  "execution_time_ms": 265
+}

@@ -1,0 +1,13 @@
+{
+  "query": "SELECT COUNT(*) as expired_presigned_remaining FROM storyScenes WHERE illustrationUrl LIKE '%X-Amz-Algorithm%';",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway05.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2ngM8wFkA348DwV.d038836586ef --database LzCHneSJWfHsfEKists2Bj --execute SELECT COUNT(*) as expired_presigned_remaining FROM storyScenes WHERE illustrationUrl LIKE '%X-Amz-Algorithm%';",
+  "rows": [
+    {
+      "expired_presigned_remaining": "0"
+    }
+  ],
+  "messages": [],
+  "stdout": "expired_presigned_remaining\n0\n",
+  "stderr": "",
+  "execution_time_ms": 266
+}
