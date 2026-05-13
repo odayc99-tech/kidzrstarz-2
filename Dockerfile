@@ -25,10 +25,8 @@ RUN pnpm install --frozen-lockfile
 # ── Build ─────────────────────────────────────────────────────────────────────
 FROM deps AS builder
 COPY . .
-# Build frontend (Vite) → dist/public
-RUN pnpm vite build
-# Compile server TypeScript → dist/
-RUN pnpm tsc -p tsconfig.server.json --outDir dist --noEmit false
+# Build frontend (Vite → dist/public) + server (esbuild → dist/index.js)
+RUN pnpm run build
 
 # ── Production image ──────────────────────────────────────────────────────────
 FROM base AS runner
@@ -43,4 +41,4 @@ COPY --from=builder /app/package.json ./package.json
 ENV PORT=3000
 EXPOSE 3000
 
-CMD ["node", "dist/server/_core/index.js"]
+CMD ["node", "dist/index.js"]
