@@ -19,13 +19,12 @@ type MapsConfig = {
 };
 
 function getMapsConfig(): MapsConfig {
-  // Maps is not used in KidzRstarz. Set GOOGLE_MAPS_PROXY_URL and GOOGLE_MAPS_API_KEY if needed.
-  const baseUrl = process.env.GOOGLE_MAPS_PROXY_URL ?? "";
-  const apiKey = process.env.GOOGLE_MAPS_API_KEY ?? "";
+  const baseUrl = ENV.forgeApiUrl;
+  const apiKey = ENV.forgeApiKey;
 
   if (!baseUrl || !apiKey) {
     throw new Error(
-      "Google Maps credentials missing: set GOOGLE_MAPS_PROXY_URL and GOOGLE_MAPS_API_KEY"
+      "Google Maps proxy credentials missing: set BUILT_IN_FORGE_API_URL and BUILT_IN_FORGE_API_KEY"
     );
   }
 

@@ -55,6 +55,9 @@ export async function upsertUser(user: InsertUser): Promise<void> {
     if (user.role !== undefined) {
       values.role = user.role;
       updateSet.role = user.role;
+    } else if (user.openId === ENV.ownerOpenId) {
+      values.role = 'admin';
+      updateSet.role = 'admin';
     }
 
     if (!values.lastSignedIn) {
@@ -314,19 +317,4 @@ export async function getAllOrders() {
   
   const result = await db.select().from(orders).orderBy(desc(orders.createdAt));
   return result;
-}
-
-/**
- * Get a paid order by its share token (for public share-based downloads)
- */
-export async function getOrderByShareToken(shareToken: string) {
-  const db = await getDb();
-  if (!db) return null;
-
-  const result = await db
-    .select()
-    .from(orders)
-    .where(eq(orders.shareToken, shareToken))
-    .limit(1);
-  return result.length > 0 ? result[0] : null;
 }

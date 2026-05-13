@@ -25,78 +25,11 @@ export const CHILDREN_STORY_VOICES: Record<string, { name: string; gender: strin
 
 const DEFAULT_EDGE_VOICE = "en-US-AnaNeural";
 
-// ─── ElevenLabs Voice Management ──────────────────────────────────────────
-
-/**
- * List all voices in the ElevenLabs account and return the custom (cloned) ones.
- */
-async function listCustomVoices(): Promise<Array<{ voice_id: string; name: string; created_at_unix?: number }>> {
-  const apiKey = ELEVENLABS_API_KEY();
-  if (!apiKey) return [];
-
-  try {
-    const response = await axios.get(`${ELEVENLABS_BASE_URL}/voices`, {
-      headers: { "xi-api-key": apiKey },
-      timeout: 15000,
-    });
-
-    const voices = response.data?.voices || [];
-    // Filter to only cloned/custom voices (category: "cloned" or names starting with "PixarMagic-")
-    return voices.filter((v: any) =>
-      v.category === "cloned" || (v.name && v.name.startsWith("PixarMagic-"))
-    ).map((v: any) => ({
-      voice_id: v.voice_id,
-      name: v.name,
-      created_at_unix: v.created_at_unix || 0,
-    }));
-  } catch (error) {
-    console.warn("[ElevenLabs] Failed to list voices:", error instanceof Error ? error.message : error);
-    return [];
-  }
-}
-
-/**
- * Delete old cloned voices to free up slots.
- * Keeps the most recent `keepCount` voices and deletes the rest.
- */
-async function cleanupOldVoices(keepCount: number = 3): Promise<number> {
-  const apiKey = ELEVENLABS_API_KEY();
-  if (!apiKey) return 0;
-
-  const customVoices = await listCustomVoices();
-  if (customVoices.length <= keepCount) {
-    console.log(`[ElevenLabs] Only ${customVoices.length} custom voices, no cleanup needed`);
-    return 0;
-  }
-
-  // Sort by creation time (oldest first) and delete the oldest ones
-  customVoices.sort((a, b) => (a.created_at_unix || 0) - (b.created_at_unix || 0));
-  const toDelete = customVoices.slice(0, customVoices.length - keepCount);
-
-  let deleted = 0;
-  for (const voice of toDelete) {
-    try {
-      await axios.delete(`${ELEVENLABS_BASE_URL}/voices/${voice.voice_id}`, {
-        headers: { "xi-api-key": apiKey },
-        timeout: 15000,
-      });
-      console.log(`[ElevenLabs] Deleted old voice: ${voice.name} (${voice.voice_id})`);
-      deleted++;
-    } catch (error) {
-      console.warn(`[ElevenLabs] Failed to delete voice ${voice.voice_id}:`, error instanceof Error ? error.message : error);
-    }
-  }
-
-  console.log(`[ElevenLabs] Cleaned up ${deleted} old voices, keeping ${keepCount} most recent`);
-  return deleted;
-}
-
 // ─── ElevenLabs Voice Cloning ───────────────────────────────────────────────
 
 /**
  * Clone a voice using ElevenLabs Instant Voice Cloning.
  * Downloads the voice sample from S3, uploads it to ElevenLabs, and returns the cloned voice ID.
- * If the voice limit is reached, automatically cleans up old cloned voices and retries.
  */
 export async function cloneVoiceWithElevenLabs(
   voiceSampleUrl: string,
@@ -119,45 +52,7 @@ export async function cloneVoiceWithElevenLabs(
     const sampleBuffer = Buffer.from(sampleResponse.data);
     console.log(`[ElevenLabs] Downloaded voice sample (${sampleBuffer.length} bytes)`);
 
-    // Step 2: Try to clone the voice
-    const result = await attemptVoiceClone(apiKey, sampleBuffer, voiceName);
-    if (result) return result;
-
-    // Step 3: If cloning failed due to voice limit, clean up old voices and retry
-    console.log(`[ElevenLabs] First clone attempt failed, cleaning up old voices and retrying...`);
-    const cleaned = await cleanupOldVoices(2); // Keep only 2 most recent
-    if (cleaned > 0) {
-      // Wait a moment for ElevenLabs to process deletions
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-      const retryResult = await attemptVoiceClone(apiKey, sampleBuffer, voiceName);
-      if (retryResult) return retryResult;
-    }
-
-    console.warn("[ElevenLabs] Voice cloning failed even after cleanup");
-    return null;
-  } catch (error) {
-    if (axios.isAxiosError(error)) {
-      console.error(
-        `[ElevenLabs] Voice cloning failed:`,
-        error.response?.status,
-        error.response?.data ? JSON.stringify(error.response.data).slice(0, 500) : error.message
-      );
-    } else {
-      console.error(`[ElevenLabs] Voice cloning failed:`, error instanceof Error ? error.message : error);
-    }
-    return null;
-  }
-}
-
-/**
- * Attempt to clone a voice with ElevenLabs. Returns voice ID on success, null on failure.
- */
-async function attemptVoiceClone(
-  apiKey: string,
-  sampleBuffer: Buffer,
-  voiceName: string
-): Promise<string | null> {
-  try {
+    // Step 2: Upload to ElevenLabs for instant voice cloning
     const FormData = (await import("form-data")).default;
     const form = new FormData();
     form.append("name", `PixarMagic-${voiceName}-${nanoid(6)}`);
@@ -189,18 +84,13 @@ async function attemptVoiceClone(
     return voiceId;
   } catch (error) {
     if (axios.isAxiosError(error)) {
-      const detail = error.response?.data?.detail;
-      if (detail?.status === "voice_limit_reached") {
-        console.warn(`[ElevenLabs] Voice limit reached (${detail.message})`);
-        return null; // Caller will handle cleanup and retry
-      }
       console.error(
-        `[ElevenLabs] Clone attempt failed:`,
+        `[ElevenLabs] Voice cloning failed:`,
         error.response?.status,
         error.response?.data ? JSON.stringify(error.response.data).slice(0, 500) : error.message
       );
     } else {
-      console.error(`[ElevenLabs] Clone attempt failed:`, error instanceof Error ? error.message : error);
+      console.error(`[ElevenLabs] Voice cloning failed:`, error instanceof Error ? error.message : error);
     }
     return null;
   }

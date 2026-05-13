@@ -11,9 +11,6 @@ import Dashboard from "./pages/Dashboard";
 import Storybook from "./pages/Storybook";
 import SharedStorybook from "./pages/SharedStorybook";
 import GuestOrders from "./pages/GuestOrders";
-import MarketingStrategy from "./pages/MarketingStrategy";
-import Admin from "./pages/Admin";
-import AdminLogin from "./pages/AdminLogin";
 
 function Router() {
   return (
@@ -24,9 +21,6 @@ function Router() {
       <Route path={"/dashboard"} component={Dashboard} />
       <Route path={"/storybook"} component={Storybook} />
       <Route path={"/my-orders"} component={GuestOrders} />
-      <Route path={"/marketing-strategy"} component={MarketingStrategy} />
-      <Route path={"/admin"} component={Admin} />
-      <Route path={"/admin-login"} component={AdminLogin} />
       <Route path={"/share/:token"} component={SharedStorybook} />
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}

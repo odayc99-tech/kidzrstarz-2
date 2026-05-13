@@ -1,8 +1,8 @@
 {
   "version": "5",
   "dialect": "mysql",
-  "id": "0b8b5f24-3121-49c1-ad32-41cbdd3e1eaa",
-  "prevId": "0b7f513d-9efc-45a3-b352-daff6e140b3f",
+  "id": "a9d5efdd-e291-445f-a251-a8fd1e0d07e2",
+  "prevId": "ae9a0b99-ff5f-4019-95cf-8e1371975df1",
   "tables": {
     "images": {
       "name": "images",
@@ -94,14 +94,7 @@
           "name": "userId",
           "type": "int",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "guestToken": {
-          "name": "guestToken",
-          "type": "varchar(64)",
-          "primaryKey": false,
-          "notNull": false,
+          "notNull": true,
           "autoincrement": false
         },
         "status": {
@@ -219,52 +212,8 @@
           "notNull": false,
           "autoincrement": false
         },
-        "elevenlabsVoiceId": {
-          "name": "elevenlabsVoiceId",
-          "type": "varchar(255)",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "shareToken": {
-          "name": "shareToken",
-          "type": "varchar(64)",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "storyTheme": {
-          "name": "storyTheme",
-          "type": "varchar(100)",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'adventure'"
-        },
         "story": {
           "name": "story",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "storyApproved": {
-          "name": "storyApproved",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": false
-        },
-        "videoKey": {
-          "name": "videoKey",
-          "type": "varchar(512)",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "videoUrl": {
-          "name": "videoUrl",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
@@ -319,20 +268,7 @@
           ]
         }
       },
-      "uniqueConstraints": {
-        "orders_guestToken_unique": {
-          "name": "orders_guestToken_unique",
-          "columns": [
-            "guestToken"
-          ]
-        },
-        "orders_shareToken_unique": {
-          "name": "orders_shareToken_unique",
-          "columns": [
-            "shareToken"
-          ]
-        }
-      },
+      "uniqueConstraints": {},
       "checkConstraint": {}
     },
     "previewImages": {

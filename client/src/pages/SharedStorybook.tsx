@@ -8,13 +8,8 @@ import {
   Film,
   Sparkles,
   Home,
-  Download,
 } from "lucide-react";
-import { toast } from "sonner";
 import { StoryPlayer, Scene } from "@/components/StoryPlayer";
-import { useCallback } from "react";
-
-
 
 export default function SharedStorybookPage() {
   const params = useParams<{ token: string }>();
@@ -28,8 +23,6 @@ export default function SharedStorybookPage() {
     { shareToken: token },
     { enabled: !!token, refetchInterval: 10000 }
   );
-
-
 
   // Loading state
   if (isLoading) {
@@ -82,19 +75,6 @@ export default function SharedStorybookPage() {
     (s) => s.status === "completed" && s.illustrationUrl
   );
   const hasCompletedScenes = completedScenes.length > 0;
-
-  const getDownloadUrl = trpc.orders.getSharedStorybookDownloadUrl.useMutation({
-    onSuccess: (data) => {
-      window.location.href = data.downloadUrl;
-    },
-    onError: (err) => {
-      toast.error(`Download failed: ${err.message}`);
-    },
-  });
-
-  const handleDownload = useCallback(() => {
-    getDownloadUrl.mutate({ shareToken: token });
-  }, [token]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
@@ -168,7 +148,6 @@ export default function SharedStorybookPage() {
             </div>
           )}
 
-
           {/* Story text */}
           {storybook.story && (
             <Card className="bg-slate-800/50 border-slate-700">
@@ -200,33 +179,6 @@ export default function SharedStorybookPage() {
                     className="w-full"
                   />
                 </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Download button — only show when video is ready */}
-          {storybook.hasVideo && (
-            <Card className="bg-gradient-to-r from-purple-900/60 to-pink-900/60 border-purple-500/40">
-              <CardContent className="pt-6 text-center">
-                <h3 className="text-base font-semibold text-white mb-3 flex items-center justify-center gap-2">
-                  <Film className="w-4 h-4 text-purple-400" />
-                  Animated Storybook Video
-                </h3>
-                <Button
-                  onClick={handleDownload}
-                  disabled={getDownloadUrl.isPending}
-                  className="bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold"
-                >
-                  {getDownloadUrl.isPending ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  ) : (
-                    <Download className="w-4 h-4 mr-2" />
-                  )}
-                  {getDownloadUrl.isPending ? "Preparing Download..." : "Download Video"}
-                </Button>
-                <p className="text-xs text-purple-300/60 mt-2">
-                  Download this personalized animated storybook.
-                </p>
               </CardContent>
             </Card>
           )}

@@ -1,0 +1,1 @@
+ALTER TABLE `orders` ADD `storyApproved` boolean DEFAULT false NOT NULL;

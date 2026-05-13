@@ -7,7 +7,7 @@ import {
   Sparkles,
   Upload,
   CreditCard,
-  Maximize,
+  Download,
   Shield,
   Clock,
   Zap,
@@ -465,7 +465,7 @@ export default function Home() {
                 desc: "Each character comes with a unique AI-generated story featuring your child.",
               },
               {
-                icon: <Maximize className="w-6 h-6 text-white" />,
+                icon: <Download className="w-6 h-6 text-white" />,
                 gradient: "from-blue-500 to-cyan-500",
                 bg: "bg-blue-50",
                 title: "High Resolution",

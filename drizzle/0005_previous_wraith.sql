@@ -1,0 +1,1 @@
+ALTER TABLE `orders` ADD `storyTheme` varchar(100) DEFAULT 'adventure' NOT NULL;

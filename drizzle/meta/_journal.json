@@ -5,29 +5,71 @@
     {
       "idx": 0,
       "version": "5",
-      "when": 1777030909987,
-      "tag": "0000_robust_starhawk",
+      "when": 1775580417967,
+      "tag": "0000_last_vindicator",
       "breakpoints": true
     },
     {
       "idx": 1,
       "version": "5",
-      "when": 1777031124749,
-      "tag": "0001_fluffy_ma_gnuci",
+      "when": 1775583841298,
+      "tag": "0001_naive_husk",
       "breakpoints": true
     },
     {
       "idx": 2,
       "version": "5",
-      "when": 1777050482981,
-      "tag": "0002_stormy_slyde",
+      "when": 1775595340027,
+      "tag": "0002_little_raza",
       "breakpoints": true
     },
     {
       "idx": 3,
       "version": "5",
-      "when": 1777050582157,
-      "tag": "0003_small_aaron_stack",
+      "when": 1775600189813,
+      "tag": "0003_needy_phil_sheldon",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1775600982375,
+      "tag": "0004_gifted_wilson_fisk",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1775602900205,
+      "tag": "0005_previous_wraith",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1775669141066,
+      "tag": "0006_open_mordo",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "5",
+      "when": 1775669577633,
+      "tag": "0007_oval_pandemic",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "5",
+      "when": 1776175259105,
+      "tag": "0008_loud_rockslide",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "5",
+      "when": 1776183874071,
+      "tag": "0009_dapper_multiple_man",
       "breakpoints": true
     }
   ]

@@ -2,7 +2,6 @@ import { generateStory } from "../services/storyGeneration";
 import { getOrderById, getDb } from "../db";
 import { orders } from "../../drizzle/schema";
 import { eq } from "drizzle-orm";
-import { notifyOwner } from "../_core/notification";
 
 export async function processStoryGeneration(orderId: number): Promise<void> {
   try {
@@ -34,16 +33,7 @@ export async function processStoryGeneration(orderId: number): Promise<void> {
     console.log(`[StoryJob] Story generated successfully for order ${orderId} with theme: ${order.storyTheme || "adventure"}`);
   } catch (error) {
     console.error(`[StoryJob] Error generating story for order ${orderId}:`, error);
-    // Notify owner about story generation failure
-    try {
-      const errMsg = error instanceof Error ? error.message : String(error);
-      await notifyOwner({
-        title: `\u26a0\ufe0f KidzRstarz: Story Generation Failed - Order #${orderId}`,
-        content: `Story generation failed for order #${orderId}.\n\nError: ${errMsg.substring(0, 400)}\n\nThe user can retry by clicking "Regenerate Story" on the checkout page.`,
-      });
-    } catch (notifyErr) {
-      console.warn(`[StoryJob] Failed to send failure notification:`, notifyErr);
-    }
+    // Don't fail the job - story generation is not critical
   }
 }
 

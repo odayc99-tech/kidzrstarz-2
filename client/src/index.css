@@ -139,11 +139,6 @@
   }
 }
 
-@keyframes shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
-}
-
 @layer components {
   /**
    * Custom container utility that centers content and adds responsive padding.

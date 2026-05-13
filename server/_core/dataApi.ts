@@ -17,16 +17,24 @@ export async function callDataApi(
   apiId: string,
   options: DataApiCallOptions = {}
 ): Promise<unknown> {
-  // This helper is not used in KidzRstarz but is kept for completeness.
-  // On Railway, wire this to your own data API if needed.
-  throw new Error("callDataApi is not configured on this deployment");
+  if (!ENV.forgeApiUrl) {
+    throw new Error("BUILT_IN_FORGE_API_URL is not configured");
+  }
+  if (!ENV.forgeApiKey) {
+    throw new Error("BUILT_IN_FORGE_API_KEY is not configured");
+  }
 
-  const fullUrl = "";
+  // Build the full URL by appending the service path to the base URL
+  const baseUrl = ENV.forgeApiUrl.endsWith("/") ? ENV.forgeApiUrl : `${ENV.forgeApiUrl}/`;
+  const fullUrl = new URL("webdevtoken.v1.WebDevService/CallApi", baseUrl).toString();
+
   const response = await fetch(fullUrl, {
     method: "POST",
     headers: {
       accept: "application/json",
       "content-type": "application/json",
+      "connect-protocol-version": "1",
+      authorization: `Bearer ${ENV.forgeApiKey}`,
     },
     body: JSON.stringify({
       apiId,

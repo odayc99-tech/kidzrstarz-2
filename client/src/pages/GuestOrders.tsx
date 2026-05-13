@@ -273,7 +273,7 @@ export default function GuestOrdersPage() {
 
                         {order.status === "completed" &&
                           order.generatedImageUrl && (
-                            <Link href={`/storybook?orderId=${order.id}${orderGuestToken ? `&guestToken=${orderGuestToken}` : ''}`}>
+                            <Link href={`/storybook?orderId=${order.id}`}>
                               <Button
                                 size="sm"
                                 className="bg-gradient-to-r from-purple-600 to-pink-600"

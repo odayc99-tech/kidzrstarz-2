@@ -14,13 +14,13 @@ import {
   CheckCircle2,
   XCircle,
   CreditCard,
+  Download,
   Eye,
   LogOut,
   Film,
   Share2,
   Copy,
   Check,
-  ShieldAlert,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useState } from "react";
@@ -143,14 +143,6 @@ export default function DashboardPage() {
             <span className="text-sm text-slate-600 hidden md:block">
               {user?.name || user?.email}
             </span>
-            {user?.role === "admin" && (
-              <Link href="/admin">
-                <Button size="sm" variant="outline" className="border-blue-300 text-blue-700 hover:bg-blue-50">
-                  <ShieldAlert className="w-4 h-4 mr-1" />
-                  Admin
-                </Button>
-              </Link>
-            )}
             <Link href="/upload">
               <Button
                 size="sm"
@@ -281,6 +273,20 @@ export default function DashboardPage() {
                       {order.status === "completed" &&
                         order.generatedImageUrl && (
                           <>
+                            <a
+                              href={order.generatedImageUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              download
+                            >
+                              <Button
+                                size="sm"
+                                className="bg-green-600 hover:bg-green-700"
+                              >
+                                <Download className="w-4 h-4 mr-1" />
+                                Download
+                              </Button>
+                            </a>
                             <Link href={`/storybook?orderId=${order.id}`}>
                               <Button
                                 size="sm"

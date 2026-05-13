@@ -1,4 +1,5 @@
 import { ENV } from "./env";
+import { withRetry } from "../services/retry";
 
 export type Role = "system" | "user" | "assistant" | "tool" | "function";
 
@@ -210,10 +211,12 @@ const normalizeToolChoice = (
 };
 
 const resolveApiUrl = () =>
-  `${ENV.openAiBaseUrl.replace(/\/$/, "")}/chat/completions`;
+  ENV.forgeApiUrl && ENV.forgeApiUrl.trim().length > 0
+    ? `${ENV.forgeApiUrl.replace(/\/$/, "")}/v1/chat/completions`
+    : "https://forge.manus.im/v1/chat/completions";
 
 const assertApiKey = () => {
-  if (!ENV.openAiApiKey) {
+  if (!ENV.forgeApiKey) {
     throw new Error("OPENAI_API_KEY is not configured");
   }
 };
@@ -278,7 +281,7 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   } = params;
 
   const payload: Record<string, unknown> = {
-    model: "gpt-4o",
+    model: "gemini-2.5-flash",
     messages: messages.map(normalizeMessage),
   };
 
@@ -294,6 +297,11 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     payload.tool_choice = normalizedToolChoice;
   }
 
+  payload.max_tokens = 32768
+  payload.thinking = {
+    "budget_tokens": 128
+  }
+
   const normalizedResponseFormat = normalizeResponseFormat({
     responseFormat,
     response_format,
@@ -305,21 +313,26 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     payload.response_format = normalizedResponseFormat;
   }
 
-  const response = await fetch(resolveApiUrl(), {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      authorization: `Bearer ${ENV.openAiApiKey}`,
+  return withRetry(
+    async () => {
+      const response = await fetch(resolveApiUrl(), {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${ENV.forgeApiKey}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(
+          `LLM invoke failed: ${response.status} ${response.statusText} – ${errorText}`
+        );
+      }
+
+      return (await response.json()) as InvokeResult;
     },
-    body: JSON.stringify(payload),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(
-      `LLM invoke failed: ${response.status} ${response.statusText} – ${errorText}`
-    );
-  }
-
-  return (await response.json()) as InvokeResult;
+    { label: "LLM invocation", maxRetries: 3, initialDelayMs: 2000 }
+  );
 }

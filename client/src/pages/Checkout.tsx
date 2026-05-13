@@ -12,6 +12,7 @@ import {
   CheckCircle2,
   AlertCircle,
   CreditCard,
+  Download,
   RefreshCw,
   Sparkles,
   Pencil,
@@ -51,9 +52,7 @@ export default function CheckoutPage() {
   const [isEditingStory, setIsEditingStory] = useState(false);
   const [editedStory, setEditedStory] = useState("");
   const [paymentPending, setPaymentPending] = useState(false);
-  const [paymentVerifyFailed, setPaymentVerifyFailed] = useState(false);
   const [savingStory, setSavingStory] = useState(false);
-  const sessionId = searchParams.get("session_id");
 
   // Get guest token for this order: first from localStorage, then from URL params as fallback
   const urlGuestToken = searchParams.get("guestToken");
@@ -107,25 +106,6 @@ export default function CheckoutPage() {
     }
   );
 
-  // Verify Stripe session immediately when returning from Stripe (fallback for delayed webhooks)
-  const verifySessionMutation = trpc.orders.verifyStripeSession.useMutation({
-    onSuccess: (data) => {
-      if (data.success) {
-        refetch();
-        if (!data.alreadyPaid) {
-          toast.success("Payment confirmed! Your storybook is being generated.");
-        }
-        setPaymentPending(false);
-        setPaymentVerifyFailed(false);
-      } else {
-        // Session not paid yet — keep polling, webhook may still arrive
-      }
-    },
-    onError: () => {
-      // Session verification failed — keep polling, show retry after timeout
-    },
-  });
-
   // Show toast for payment result from Stripe redirect
   useEffect(() => {
     if (paymentResult === "success") {
@@ -133,30 +113,14 @@ export default function CheckoutPage() {
       setPaymentPending(true);
       const newParams = new URLSearchParams(searchString);
       newParams.delete("payment");
-      newParams.delete("session_id");
       newParams.delete("from_webdev");
       setLocation(`/checkout?${newParams.toString()}`, { replace: true });
-
-      // Immediately verify the Stripe session (don't wait for webhook)
-      if (sessionId && orderId) {
-        verifySessionMutation.mutate({
-          orderId,
-          sessionId,
-          guestToken: guestToken || undefined,
-        });
-      }
-
-      // Also poll as a secondary mechanism
       const pollInterval = setInterval(() => {
         refetch();
-      }, 3000);
+      }, 2000);
       const timeout = setTimeout(() => {
         clearInterval(pollInterval);
         setPaymentPending(false);
-        // If still not paid after 60s, show the failed state so user can retry
-        if (order?.paymentStatus !== "paid") {
-          setPaymentVerifyFailed(true);
-        }
       }, 60000);
       return () => {
         clearInterval(pollInterval);
@@ -166,7 +130,6 @@ export default function CheckoutPage() {
       toast.info("Payment was cancelled. You can try again when ready.");
       const newParams = new URLSearchParams(searchString);
       newParams.delete("payment");
-      newParams.delete("session_id");
       setLocation(`/checkout?${newParams.toString()}`, { replace: true });
     }
   }, [paymentResult]);
@@ -673,7 +636,7 @@ export default function CheckoutPage() {
               </CardContent>
             </Card>
 
-            {/* Payment Section */}
+            {/* Payment / Download Section */}
             {order.paymentStatus === "paid" ? (
               <Card className="border-green-200 bg-green-50">
                 <CardContent className="pt-6">
@@ -688,7 +651,7 @@ export default function CheckoutPage() {
                         <p className="text-green-700 mb-4">
                           Your Pixar character and animated storybook are ready!
                         </p>
-                        <Link href={`/storybook?orderId=${orderId}${guestToken ? `&guestToken=${guestToken}` : ''}`}>
+                        <Link href={`/storybook?orderId=${orderId}`}>
                           <Button className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700">
                             <Film className="w-4 h-4 mr-2" />
                             Watch Animated Storybook
@@ -722,27 +685,6 @@ export default function CheckoutPage() {
                         </div>
                       </>
                     )}
-                  </div>
-                </CardContent>
-              </Card>
-            ) : paymentVerifyFailed ? (
-              <Card className="border-orange-200 bg-orange-50">
-                <CardContent className="pt-6">
-                  <div className="text-center">
-                    <AlertCircle className="w-12 h-12 text-orange-500 mx-auto mb-4" />
-                    <h3 className="text-xl font-bold text-orange-800 mb-2">
-                      Payment Verification Delayed
-                    </h3>
-                    <p className="text-orange-700 mb-4">
-                      Your payment may have been processed but we haven't received confirmation yet. Please check your email for a receipt from Stripe, then click below to retry.
-                    </p>
-                    <Button
-                      onClick={() => { setPaymentVerifyFailed(false); refetch(); }}
-                      className="w-full bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600"
-                    >
-                      <RefreshCw className="w-4 h-4 mr-2" />
-                      Check Payment Status
-                    </Button>
                   </div>
                 </CardContent>
               </Card>
@@ -899,7 +841,6 @@ function StripeCheckoutButton({
         orderId,
         guestToken: guestToken || undefined,
         promoCode: promoCode || undefined,
-        origin: window.location.origin,
       });
     } catch (error) {
       setLoading(false);

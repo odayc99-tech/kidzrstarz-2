@@ -1,8 +1,8 @@
 {
   "version": "5",
   "dialect": "mysql",
-  "id": "0f0f4923-3a35-4263-802c-80ff94a4c16f",
-  "prevId": "73279f9c-2d2c-4112-9e5d-84a8183c5edc",
+  "id": "36334dd4-b365-43e3-ac64-b5ab0df916b2",
+  "prevId": "a144ccc6-bc44-4e25-92e5-b4f7f30c872d",
   "tables": {
     "images": {
       "name": "images",
@@ -191,12 +191,56 @@
           "notNull": false,
           "autoincrement": false
         },
+        "childDescription": {
+          "name": "childDescription",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "voiceSampleKey": {
+          "name": "voiceSampleKey",
+          "type": "varchar(512)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "voiceSampleUrl": {
+          "name": "voiceSampleUrl",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "elevenlabsVoiceId": {
+          "name": "elevenlabsVoiceId",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "storyTheme": {
+          "name": "storyTheme",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'adventure'"
+        },
         "story": {
           "name": "story",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
+        },
+        "storyApproved": {
+          "name": "storyApproved",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
         },
         "errorMessage": {
           "name": "errorMessage",
@@ -311,6 +355,111 @@
       "compositePrimaryKeys": {
         "previewImages_id": {
           "name": "previewImages_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
+    "storyScenes": {
+      "name": "storyScenes",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "orderId": {
+          "name": "orderId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "sceneIndex": {
+          "name": "sceneIndex",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "sceneText": {
+          "name": "sceneText",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "illustrationPrompt": {
+          "name": "illustrationPrompt",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "illustrationUrl": {
+          "name": "illustrationUrl",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "illustrationKey": {
+          "name": "illustrationKey",
+          "type": "varchar(512)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "narrationUrl": {
+          "name": "narrationUrl",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "narrationKey": {
+          "name": "narrationKey",
+          "type": "varchar(512)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "enum('pending','generating_image','generating_audio','completed','failed')",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'pending'"
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(now())"
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "onUpdate": true,
+          "default": "(now())"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "storyScenes_id": {
+          "name": "storyScenes_id",
           "columns": [
             "id"
           ]
