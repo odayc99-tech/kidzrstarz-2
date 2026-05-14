@@ -58,11 +58,11 @@ export async function processImageGeneration(orderId: number): Promise<void> {
       console.log(`[Job] Story not yet approved for order ${orderId}, video generation will start after approval`);
     }
 
-    // Notify owner of successful generation
-    await notifyOwner({
+    // Notify owner of successful generation (non-blocking — don't let notification failure corrupt order status)
+    notifyOwner({
       title: `KidzRstarz: Image Generated (Order #${orderId})`,
       content: `User received their Pixar character image for order #${orderId}.${updatedOrder?.storyApproved ? ' Video generation started.' : ' Awaiting story approval for video.'}`,
-    });
+    }).catch((e) => console.warn(`[Job] Failed to notify owner for order ${orderId}:`, e));
   } catch (error) {
     console.error(`[Job] Error processing image generation for order ${orderId}:`, error);
 
