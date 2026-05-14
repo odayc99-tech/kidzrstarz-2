@@ -162,27 +162,41 @@ export default function StorybookPage() {
     setDownloading(null);
   }, [order, orderId]);
 
+  const getVideoDownloadUrl = trpc.orders.getVideoDownloadUrl.useMutation();
+
   const handleDownloadVideo = useCallback(async () => {
-    if (!scenes || scenes.length === 0) return;
-
-    const completedScenes = scenes.filter(
-      (s) => s.status === "completed" && s.illustrationUrl
-    );
-
-    if (completedScenes.length === 0) {
-      toast.error("No completed scenes to download.");
-      return;
-    }
-
+    if (!orderId) return;
     setDownloading("video");
     setVideoProgress(0);
-    setVideoStatus("Preparing...");
-
+    setVideoStatus("Preparing download...");
     try {
-      // Get BGM URL for the story theme
+      // Prefer server-generated MP4 (already composed with narration + BGM)
+      if (order?.videoUrl) {
+        setVideoStatus("Getting download link...");
+        const { downloadUrl, filename } = await getVideoDownloadUrl.mutateAsync({
+          orderId,
+          guestToken: guestToken || undefined,
+        });
+        setVideoStatus("Downloading MP4...");
+        await downloadFile(downloadUrl, filename);
+        toast.success("Storybook video downloaded!");
+        return;
+      }
+
+      // Fallback: client-side composition if server video not ready yet
+      if (!scenes || scenes.length === 0) {
+        toast.error("No scenes available to download.");
+        return;
+      }
+      const completedScenes = scenes.filter(
+        (s) => s.status === "completed" && s.illustrationUrl
+      );
+      if (completedScenes.length === 0) {
+        toast.error("No completed scenes to download.");
+        return;
+      }
       const theme = order?.storyTheme || "adventure";
       const bgmConfig = THEME_BGM[theme] || THEME_BGM.adventure;
-
       const videoBlob = await composeVideoInBrowser({
         scenes: completedScenes.map((s) => ({
           illustrationUrl: s.illustrationUrl!,
@@ -196,29 +210,26 @@ export default function StorybookPage() {
           setVideoStatus(status);
         },
       });
-
-      // Download the composed video
       const childName = order?.childName || "storybook";
       const safeName = childName.replace(/[^a-zA-Z0-9]/g, "_").toLowerCase();
       const blobUrl = URL.createObjectURL(videoBlob);
       const a = document.createElement("a");
       a.href = blobUrl;
-      a.download = `${safeName}_storybook.webm`;
+      a.download = `${safeName}_storybook.mp4`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(blobUrl);
-
       toast.success("Storybook video downloaded!");
     } catch (err: any) {
-      console.error("Video composition failed:", err);
-      toast.error(`Video creation failed: ${err.message || "Unknown error"}. Try downloading individual scenes instead.`);
+      console.error("Video download failed:", err);
+      toast.error(`Video download failed: ${err.message || "Unknown error"}. Please try again.`);
     } finally {
       setDownloading(null);
       setVideoProgress(0);
       setVideoStatus("");
     }
-  }, [scenes, order]);
+  }, [scenes, order, orderId, guestToken, getVideoDownloadUrl]);
 
   const handleRegenerate = () => {
     if (showRegenConfirm) {
@@ -478,7 +489,7 @@ export default function StorybookPage() {
                             <div className="text-left">
                               <div className="font-semibold">Create & Download Video</div>
                               <div className="text-xs opacity-75">
-                                WebM with narration & music
+                                {order?.videoUrl ? "MP4 with narration & music" : "Compose & download video"}
                               </div>
                             </div>
                           </>
