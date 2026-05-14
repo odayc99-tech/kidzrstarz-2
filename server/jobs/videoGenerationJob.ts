@@ -434,13 +434,16 @@ async function processScene(
       : "";
 
     const imageResult = await generateImage({
-      prompt: `${characterBlock}SCENE ILLUSTRATION:\n${scene.illustrationPrompt}
+      prompt: `CONTENT POLICY: This is a completely child-safe, G-rated, family-friendly children's storybook illustration. All content is wholesome and appropriate for young children ages 2-10.
+
+${characterBlock}SCENE ILLUSTRATION:\n${scene.illustrationPrompt}
 
 CRITICAL RULES:
 1. The character in this scene MUST match the reference image EXACTLY — same face, hair, eyes, skin, clothing, proportions.
 2. Only change the character's pose, expression, and the background/setting.
-3. Style: High-quality 3D Pixar/Disney animation, children's storybook illustration, cinematic lighting, vibrant saturated colors, movie-quality render.
-4. Do NOT add, remove, or change any clothing items or accessories from the character description above.`,
+3. Style: High-quality 3D Pixar/Disney animation, children's storybook illustration, cinematic lighting, vibrant saturated colors, movie-quality render. G-rated and family-friendly.
+4. Do NOT add, remove, or change any clothing items or accessories from the character description above.
+5. All content must be completely child-safe, wholesome, and appropriate for a children's picture book.`,
       originalImages: [
         {
           url: characterImageUrl,
