@@ -175,7 +175,7 @@ export default function SharedStorybookPage() {
                 <div className="rounded-xl overflow-hidden max-w-sm mx-auto">
                   <img
                     src={storybook.generatedImageUrl}
-                    alt={`${storybook.childName}'s Pixar character`}
+                    alt={`${storybook.childName}'s animated character`}
                     className="w-full"
                   />
                 </div>

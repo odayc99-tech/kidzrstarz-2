@@ -600,7 +600,7 @@ export default function StorybookPage() {
                   <div className="rounded-xl overflow-hidden max-w-sm mx-auto">
                     <img
                       src={order.generatedImageUrl}
-                      alt={`${order.childName}'s Pixar character`}
+                      alt={`${order.childName}'s animated character`}
                       className="w-full"
                     />
                   </div>

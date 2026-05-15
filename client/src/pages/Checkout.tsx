@@ -649,7 +649,7 @@ export default function CheckoutPage() {
                     {order.status === "completed" && order.generatedImageUrl ? (
                       <>
                         <p className="text-green-700 mb-4">
-                          Your Pixar character and animated storybook are ready!
+                          Your animated character and storybook are ready!
                         </p>
                         <Link href={`/storybook?orderId=${orderId}`}>
                           <Button className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700">

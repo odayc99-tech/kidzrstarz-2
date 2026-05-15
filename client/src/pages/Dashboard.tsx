@@ -192,7 +192,7 @@ export default function DashboardPage() {
                 No Characters Yet
               </h3>
               <p className="text-slate-600 mb-6">
-                Create your first Pixar character transformation!
+                Create your first animated character storybook!
               </p>
               <Link href="/upload">
                 <Button className="bg-gradient-to-r from-blue-600 to-purple-600">

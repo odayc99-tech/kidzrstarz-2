@@ -45,7 +45,7 @@ export const testimonials: Testimonial[] = [
     name: "Jessica Martinez",
     role: "Grandmother",
     content:
-      "I got this done for my granddaughter and she absolutely loves it! The Pixar style is perfect. It's now hanging on our living room wall. Such a special keepsake!",
+      "I got this done for my granddaughter and she absolutely loves it! The animation style is perfect. It's now hanging on our living room wall. Such a special keepsake!",
     rating: 5,
     childName: "Sophia",
     beforeImage:
