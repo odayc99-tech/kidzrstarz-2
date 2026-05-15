@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ProgressBar, Step } from "@/components/ProgressBar";
 import { Link, useSearch, useLocation } from "wouter";
-import { getLoginUrl } from "@/const";
 import {
   ArrowLeft,
   Loader2,
@@ -36,7 +35,7 @@ const STEPS: Step[] = [
 ];
 
 export default function CheckoutPage() {
-  const { user, isAuthenticated, loading: authLoading } = useAuth();
+  const { user, isAuthenticated, loading: authLoading, openSignIn } = useAuth();
   const [, setLocation] = useLocation();
   const searchString = useSearch();
   const searchParams = useMemo(
@@ -239,11 +238,9 @@ export default function CheckoutPage() {
               We couldn't find this order. If you created it on another device, please sign in to access it.
             </p>
             <div className="space-y-3">
-              <a href={getLoginUrl()}>
-                <Button className="w-full bg-gradient-to-r from-blue-600 to-purple-600">
+                              <Button className="w-full bg-gradient-to-r from-blue-600 to-purple-600"> onClick={() => openSignIn()}
                   Sign In
                 </Button>
-              </a>
               <Link href="/upload">
                 <Button variant="outline" className="w-full">
                   Create New Order
@@ -363,11 +360,9 @@ export default function CheckoutPage() {
               <UserPlus className="w-4 h-4 inline mr-1.5 -mt-0.5" />
               <span className="font-medium">Create an account</span> to save your orders and access them from any device.
             </p>
-            <a href={getLoginUrl()}>
-              <Button variant="outline" size="sm" className="border-blue-300 text-blue-700 hover:bg-blue-100 whitespace-nowrap">
+                          <Button variant="outline" size="sm" className="border-blue-300 text-blue-700 hover:bg-blue-100 whitespace-nowrap"> onClick={() => openSignIn()}
                 Sign In / Sign Up
               </Button>
-            </a>
           </div>
         </div>
       )}

@@ -3,7 +3,6 @@ import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Link } from "wouter";
-import { getLoginUrl } from "@/const";
 import {
   ArrowLeft,
   Loader2,
@@ -26,7 +25,7 @@ import { toast } from "sonner";
 import { useState } from "react";
 
 export default function DashboardPage() {
-  const { user, isAuthenticated, loading: authLoading, logout } = useAuth();
+  const { user, isAuthenticated, loading: authLoading, logout, openSignIn } = useAuth();
   const [copiedOrderId, setCopiedOrderId] = useState<number | null>(null);
 
   const {
@@ -88,11 +87,9 @@ export default function DashboardPage() {
             <p className="text-slate-600 mb-6">
               Please sign in to view your dashboard.
             </p>
-            <a href={getLoginUrl()}>
-              <Button className="w-full bg-gradient-to-r from-blue-600 to-purple-600">
+                          <Button className="w-full bg-gradient-to-r from-blue-600 to-purple-600" onClick={() => openSignIn()}>
                 Sign In
               </Button>
-            </a>
           </CardContent>
         </Card>
       </div>

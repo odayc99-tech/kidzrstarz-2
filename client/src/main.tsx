@@ -4,8 +4,9 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { httpBatchLink, TRPCClientError } from "@trpc/client";
 import { createRoot } from "react-dom/client";
 import superjson from "superjson";
+import { ClerkProvider } from "@clerk/clerk-react";
 import App from "./App";
-import { getLoginUrl } from "./const";
+import { CLERK_PUBLISHABLE_KEY } from "./const";
 import "./index.css";
 
 const queryClient = new QueryClient();
@@ -13,12 +14,10 @@ const queryClient = new QueryClient();
 const redirectToLoginIfUnauthorized = (error: unknown) => {
   if (!(error instanceof TRPCClientError)) return;
   if (typeof window === "undefined") return;
-
   const isUnauthorized = error.message === UNAUTHED_ERR_MSG;
-
   if (!isUnauthorized) return;
-
-  window.location.href = getLoginUrl();
+  // Clerk modal will handle sign-in; just reload to show it
+  window.location.reload();
 };
 
 queryClient.getQueryCache().subscribe(event => {
@@ -47,7 +46,6 @@ const trpcClient = trpc.createClient({
           ...(init ?? {}),
           credentials: "include",
         });
-        // Detect non-JSON responses (e.g., HTML error pages from proxy/deployment)
         const contentType = response.headers.get("content-type") || "";
         if (!contentType.includes("application/json") && !response.ok) {
           throw new Error(
@@ -60,14 +58,11 @@ const trpcClient = trpc.createClient({
   ],
 });
 
-// Add retry logic for transient failures
 queryClient.setDefaultOptions({
   queries: {
     retry: (failureCount, error) => {
-      // Retry up to 3 times for transient errors (non-JSON responses, network errors)
       if (failureCount >= 3) return false;
       if (error instanceof TRPCClientError) {
-        // Don't retry auth errors or validation errors
         if (error.message === UNAUTHED_ERR_MSG) return false;
         if (error.data?.code === "BAD_REQUEST") return false;
         if (error.data?.code === "NOT_FOUND") return false;
@@ -80,9 +75,11 @@ queryClient.setDefaultOptions({
 });
 
 createRoot(document.getElementById("root")!).render(
-  <trpc.Provider client={trpcClient} queryClient={queryClient}>
-    <QueryClientProvider client={queryClient}>
-      <App />
-    </QueryClientProvider>
-  </trpc.Provider>
+  <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY}>
+    <trpc.Provider client={trpcClient} queryClient={queryClient}>
+      <QueryClientProvider client={queryClient}>
+        <App />
+      </QueryClientProvider>
+    </trpc.Provider>
+  </ClerkProvider>
 );

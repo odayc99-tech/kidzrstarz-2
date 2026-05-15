@@ -8,7 +8,6 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ProgressBar, Step } from "@/components/ProgressBar";
 import { Link, useLocation } from "wouter";
-import { getLoginUrl } from "@/const";
 import {
   Upload as UploadIcon,
   Image as ImageIcon,
@@ -56,7 +55,7 @@ const THEME_OPTIONS = [
 ];
 
 export default function UploadPage() {
-  const { user, isAuthenticated, loading: authLoading } = useAuth();
+  const { user, isAuthenticated, loading: authLoading, openSignIn } = useAuth();
   const [, setLocation] = useLocation();
 
   const [currentStep, setCurrentStep] = useState(0);
@@ -312,11 +311,9 @@ export default function UploadPage() {
               <UserPlus className="w-4 h-4 inline mr-1.5 -mt-0.5" />
               <span className="font-medium">Create an account</span> to save your orders and access them later from any device.
             </p>
-            <a href={getLoginUrl()}>
-              <Button variant="outline" size="sm" className="border-blue-300 text-blue-700 hover:bg-blue-100 whitespace-nowrap">
+                          <Button variant="outline" size="sm" className="border-blue-300 text-blue-700 hover:bg-blue-100 whitespace-nowrap"> onClick={() => openSignIn()}
                 Sign In / Sign Up
               </Button>
-            </a>
           </div>
         </div>
       )}

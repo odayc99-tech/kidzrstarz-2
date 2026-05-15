@@ -2,7 +2,6 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { getLoginUrl } from "@/const";
 import { ArrowRight, Sparkles } from "lucide-react";
 
 interface GalleryItem {
@@ -86,7 +85,7 @@ const galleryItems: GalleryItem[] = [
 ];
 
 export default function GallerySection() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, openSignIn } = useAuth();
   const [hoveredId, setHoveredId] = useState<number | null>(null);
 
   return (
@@ -188,15 +187,13 @@ export default function GallerySection() {
               </Button>
             </Link>
           ) : (
-            <a href={getLoginUrl()}>
-              <Button
+                          <Button
                 size="lg"
                 className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-lg px-8 py-6 shadow-lg hover:shadow-xl transition-all"
-              >
+              > onClick={() => openSignIn()}
                 Create Your Child's Character
                 <ArrowRight className="ml-2 w-5 h-5" />
               </Button>
-            </a>
           )}
         </div>
       </div>

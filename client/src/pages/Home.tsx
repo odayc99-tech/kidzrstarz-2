@@ -2,7 +2,6 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Link } from "wouter";
-import { getLoginUrl } from "@/const";
 import {
   Sparkles,
   Upload,
@@ -25,7 +24,7 @@ const LOGO_URL =
   "https://d2xsxph8kpxj0f.cloudfront.net/310519663488009170/4GL2mPjHtW2yMjS2aSQkPm/kidzrstarz-logo_5f53c312.png";
 
 export default function Home() {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, openSignIn } = useAuth();
 
   return (
     <div className="min-h-screen flex flex-col bg-white overflow-x-hidden">
@@ -86,11 +85,9 @@ export default function Home() {
               </div>
             ) : (
               <div className="flex items-center gap-3">
-                <a href={getLoginUrl()}>
-                  <Button variant="outline" size="sm" className="border-purple-200 text-purple-700 hover:bg-purple-50 hidden sm:inline-flex">
+                <Button variant="outline" size="sm" className="border-purple-200 text-purple-700 hover:bg-purple-50 hidden sm:inline-flex" onClick={() => openSignIn()}>
                     My Account
                   </Button>
-                </a>
                 <Link href="/upload">
                   <Button
                     size="sm"
@@ -221,15 +218,14 @@ export default function Home() {
                     </Button>
                   </Link>
                 ) : (
-                  <a href={getLoginUrl()}>
-                    <Button
+                  <Button
                       size="lg"
                       className="bg-gradient-to-r from-yellow-400 via-orange-400 to-pink-500 hover:from-yellow-500 hover:via-orange-500 hover:to-pink-600 text-slate-900 font-bold text-lg px-8 py-6 rounded-full shadow-lg hover:shadow-xl transition-all hover:scale-105"
+                      onClick={() => openSignIn()}
                     >
                       <Wand2 className="mr-2 w-5 h-5" />
                       Start the Magic - $29.99
                     </Button>
-                  </a>
                 )}
                 <a href="#how-it-works">
                   <Button
@@ -553,12 +549,10 @@ export default function Home() {
                       </Button>
                     </Link>
                   ) : (
-                    <a href={getLoginUrl()}>
-                      <Button className="w-full bg-gradient-to-r from-purple-600 via-pink-500 to-orange-400 hover:from-purple-700 hover:via-pink-600 hover:to-orange-500 py-6 text-lg rounded-full shadow-md font-bold">
+                    <Button className="w-full bg-gradient-to-r from-purple-600 via-pink-500 to-orange-400 hover:from-purple-700 hover:via-pink-600 hover:to-orange-500 py-6 text-lg rounded-full shadow-md font-bold" onClick={() => openSignIn()}>
                         <Wand2 className="mr-2 w-5 h-5" />
                         Get Started Now
                       </Button>
-                    </a>
                   )}
                 </div>
               </CardContent>

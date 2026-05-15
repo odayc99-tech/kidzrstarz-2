@@ -3,7 +3,6 @@ import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Link, useSearch } from "wouter";
-import { getLoginUrl } from "@/const";
 import {
   ArrowLeft,
   Loader2,
@@ -60,7 +59,7 @@ async function downloadFile(url: string, filename: string, proxyUrl?: string) {
 }
 
 export default function StorybookPage() {
-  const { user, isAuthenticated, loading: authLoading } = useAuth();
+  const { user, isAuthenticated, loading: authLoading, openSignIn } = useAuth();
   const searchString = useSearch();
   const params = useMemo(() => new URLSearchParams(searchString), [searchString]);
   const orderId = parseInt(params.get("orderId") || "0");
@@ -265,11 +264,9 @@ export default function StorybookPage() {
               We couldn't find this storybook. If you created it on another device, please sign in to access it.
             </p>
             <div className="space-y-3">
-              <a href={getLoginUrl()}>
-                <Button className="w-full bg-gradient-to-r from-purple-600 to-pink-600">
+                              <Button className="w-full bg-gradient-to-r from-purple-600 to-pink-600"> onClick={() => openSignIn()}
                   Sign In
                 </Button>
-              </a>
               <Link href="/upload">
                 <Button variant="outline" className="w-full border-slate-600 text-slate-300">
                   Create New Story
@@ -399,11 +396,9 @@ export default function StorybookPage() {
               <UserPlus className="w-4 h-4 inline mr-1.5 -mt-0.5" />
               <span className="font-medium">Create an account</span> to save your storybooks and share them with family.
             </p>
-            <a href={getLoginUrl()}>
-              <Button variant="outline" size="sm" className="border-purple-400/50 text-purple-200 hover:bg-purple-800/50 whitespace-nowrap">
+                          <Button variant="outline" size="sm" className="border-purple-400/50 text-purple-200 hover:bg-purple-800/50 whitespace-nowrap"> onClick={() => openSignIn()}
                 Sign In / Sign Up
               </Button>
-            </a>
           </div>
         </div>
       )}

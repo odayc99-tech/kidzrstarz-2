@@ -10,4 +10,5 @@ export const ENV = {
   openAiApiKey: process.env.OPENAI_API_KEY ?? "",
   openAiBaseUrl: process.env.OPENAI_BASE_URL ?? "https://api.openai.com/v1",
   adminSecret: process.env.ADMIN_SECRET ?? "",
+  clerkSecretKey: process.env.CLERK_SECRET_KEY ?? "",
 };

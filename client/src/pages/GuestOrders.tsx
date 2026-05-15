@@ -3,7 +3,6 @@ import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Link, useLocation } from "wouter";
-import { getLoginUrl } from "@/const";
 import { getAllGuestTokens, getGuestToken } from "@/lib/guestToken";
 import {
   ArrowLeft,
@@ -22,7 +21,7 @@ import {
 import { useMemo } from "react";
 
 export default function GuestOrdersPage() {
-  const { isAuthenticated, loading: authLoading } = useAuth();
+  const { isAuthenticated, loading: authLoading, openSignIn } = useAuth();
   const [, navigate] = useLocation();
 
   // If authenticated, redirect to dashboard
@@ -117,15 +116,13 @@ export default function GuestOrdersPage() {
             <span className="font-medium">Create an account</span> to save your
             orders permanently and access them from any device.
           </p>
-          <a href={getLoginUrl()}>
-            <Button
+                      <Button
               variant="outline"
               size="sm"
               className="border-purple-300 text-purple-700 hover:bg-purple-100 whitespace-nowrap"
-            >
+            > onClick={() => openSignIn()}
               Sign In / Sign Up
             </Button>
-          </a>
         </div>
       </div>
 
@@ -184,14 +181,12 @@ export default function GuestOrdersPage() {
                 Check your dashboard after signing in.
               </p>
               <div className="flex gap-3 justify-center">
-                <a href={getLoginUrl()}>
-                  <Button
+                                  <Button
                     variant="outline"
                     className="border-purple-300 text-purple-700"
-                  >
+                  > onClick={() => openSignIn()}
                     Sign In
                   </Button>
-                </a>
                 <Link href="/upload">
                   <Button className="bg-gradient-to-r from-blue-600 to-purple-600">
                     <Plus className="w-4 h-4 mr-2" />
