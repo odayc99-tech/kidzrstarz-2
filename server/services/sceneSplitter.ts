@@ -15,7 +15,7 @@ export interface StoryScene {
  * 2. Instructing the LLM to use ONLY scene-specific actions/settings in prompts
  * 3. The caller (videoGenerationJob) prepends the canonical description to each prompt
  * 
- * @param canonicalDescription - The exact character description extracted from the Pixar image.
+ * @param canonicalDescription - The exact character description extracted from the generated character image.
  *   This will be prepended to each illustration prompt by the caller, so the LLM should focus
  *   on scene-specific content (action, setting, mood, expression).
  */
@@ -37,7 +37,7 @@ Your illustrationPrompt should focus ONLY on the scene-specific content:
 - The SETTING/BACKGROUND (forest, spaceship, underwater cave, etc.)
 - The MOOD/LIGHTING (warm sunset, mysterious moonlight, bright cheerful, etc.)
 - Any OTHER CHARACTERS or objects in the scene
-- Style: "3D Pixar/Disney animation style, vibrant colors, soft cinematic lighting, movie quality render"
+- Style: "premium 3D cinematic animation style, vibrant colors, soft cinematic lighting, movie quality render"
 
 Do NOT include character physical description (hair, eyes, skin, clothing) in the illustrationPrompt — that is handled separately.`
     : `\nEvery illustrationPrompt MUST begin with a detailed physical description of ${childName} (hair color, eye color, skin tone, clothing, build) that is IDENTICAL across all 5 scenes. After the character description, describe the specific scene.`;
@@ -50,7 +50,7 @@ Do NOT include character physical description (hair, eyes, skin, clothing) in th
 
 For each scene, provide:
 1. The narration text (1-3 sentences, read aloud to the child)
-2. A detailed illustration prompt for generating a Pixar/Disney 3D-style image
+2. A detailed illustration prompt for generating a premium 3D cinematic animated image
 ${characterGuidance}`,
       },
       {

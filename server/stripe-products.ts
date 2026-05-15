@@ -1,12 +1,12 @@
 /**
  * Stripe Products Configuration
- * Define all products and prices for the Pixar transformation service
+ * Define all products and prices for the KidzRstarz animated storybook service
  */
 
 export const PRODUCTS = {
   PIXAR_TRANSFORMATION: {
-    name: "Pixar 3D Character Transformation",
-    description: "Transform your child's photo into a stunning 3D Pixar-style character image",
+    name: "3D Animated Character Storybook",
+    description: "Transform your child's photo into a stunning 3D animated character in a personalized storybook video",
     priceInCents: 2999, // $29.99
     currency: "usd",
   },

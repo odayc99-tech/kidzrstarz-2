@@ -5,7 +5,7 @@ import { applyBrandWatermark } from "./watermark";
 import { getStorageNamespace } from "./storageNamespace";
 
 /**
- * Generate a Pixar-style 3D character image from an original photo.
+ * Generate a 3D animated character image from an original photo.
  * The prompt is crafted to ensure the AI actually transforms the child
  * into a 3D animated character rather than returning the original photo.
  * 
@@ -20,27 +20,27 @@ export async function generatePixarCharacter(
   childDescription?: string | null
 ): Promise<{ imageUrl: string; imageKey: string }> {
   try {
-    console.log(`[ImageGeneration] Starting Pixar transformation for ${childName}`);
+    console.log(`[ImageGeneration] Starting 3D animated character transformation for ${childName}`);
 
     // Build description section if provided
     const descriptionSection = childDescription
       ? `\nPhysical description of the child (use these details to make the character more accurate):
 ${childDescription}
-Incorporate these physical traits into the 3D character while maintaining the Pixar animation style.`
+Incorporate these physical traits into the 3D character while maintaining the cinematic 3D animation style.`
       : "";
 
     // Highly specific prompt that instructs the model to TRANSFORM the photo
-    const prompt = `IMPORTANT: Completely re-create and transform the person in this photo into a fully 3D-rendered Pixar/Disney-style animated character. Do NOT keep the original photograph — generate a brand-new 3D cartoon illustration from scratch based on the person's likeness.
+    const prompt = `IMPORTANT: Completely re-create and transform the person in this photo into a fully 3D-rendered cinematic animated character. Do NOT keep the original photograph — generate a brand-new 3D cartoon illustration from scratch based on the person's likeness.
 
 Requirements:
-- Full 3D CGI render in the style of Pixar Animation Studios (like characters from Coco, Inside Out, Toy Story, or Up)
+- Full 3D CGI render in a premium cinematic animation style (expressive, vibrant, movie-quality)
 - Exaggerated cartoon proportions: large expressive eyes, smooth rounded features, stylized hair
-- Vibrant, saturated color palette typical of Pixar films
-- Soft ambient lighting with subtle rim light, as seen in Pixar movie posters
+- Vibrant, saturated color palette typical of high-end animated films
+- Soft ambient lighting with subtle rim light, as seen in animated movie posters
 - Clean, soft gradient or colorful fantasy background (NOT the original photo background)
 - The character should clearly resemble the child in the photo but rendered entirely as a 3D animated character
 - Professional animation studio quality, suitable for a movie poster
-- The final image must look like a screenshot from a Pixar movie, NOT a photograph with filters
+- The final image must look like a screenshot from a premium animated movie, NOT a photograph with filters
 ${descriptionSection}
 Character name: ${childName}`;
 
@@ -71,7 +71,7 @@ Character name: ${childName}`;
 
     // Upload to S3 with user/order-specific path
     const ns = getStorageNamespace(userId, orderId);
-    const fileKey = `${ns}/generated/${nanoid()}-pixar-character.png`;
+    const fileKey = `${ns}/generated/${nanoid()}-animated-character.png`;
     const { url: s3Url } = await storagePut(
       fileKey,
       brandedBuffer,
@@ -87,7 +87,7 @@ Character name: ${childName}`;
       imageKey: fileKey,
     };
   } catch (error) {
-    console.error("[ImageGeneration] Error generating Pixar character:", error);
+    console.error("[ImageGeneration] Error generating animated character:", error);
     throw error;
   }
 }

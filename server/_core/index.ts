@@ -69,7 +69,7 @@ async function startServer() {
         contentType = "video/mp4";
       } else if (type === "character") {
         sourceUrl = order.generatedImageUrl;
-        filename = `${safeName}_pixar_character.png`;
+        filename = `${safeName}_animated_character.png`;
         contentType = "image/png";
       } else {
         return res.status(400).json({ error: "Invalid download type" });

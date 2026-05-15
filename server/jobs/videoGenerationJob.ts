@@ -14,7 +14,7 @@ import { composeStorybookVideo } from "../services/videoComposition";
 
 
 /**
- * Extract a detailed canonical character description from the generated Pixar image.
+ * Extract a detailed canonical character description from the generated animated character image.
  * This description is then embedded in every scene prompt for maximum consistency.
  */
 async function extractCharacterDescription(
@@ -28,7 +28,7 @@ async function extractCharacterDescription(
       messages: [
         {
           role: "system",
-          content: `You are a character design analyst. Given an image of a 3D Pixar/Disney animated character, produce a precise, reusable character description that can be copy-pasted into every scene illustration prompt to ensure perfect visual consistency.
+          content: `You are a character design analyst. Given an image of a 3D animated character, produce a precise, reusable character description that can be copy-pasted into every scene illustration prompt to ensure perfect visual consistency.
 
 Your description MUST include ALL of the following in this exact order:
 1. Gender and approximate age
@@ -46,7 +46,7 @@ Write it as a single dense paragraph. Do NOT include scene actions, expressions,
           content: [
             {
               type: "text" as const,
-              text: `Describe this 3D Pixar/Disney animated character named ${childName} in precise detail for reuse in illustration prompts.${childDescription ? ` Known details: ${childDescription}` : ""}`,
+              text: `Describe this 3D animated character named ${childName} in precise detail for reuse in illustration prompts.${childDescription ? ` Known details: ${childDescription}` : ""}`,
             },
             {
               type: "image_url" as const,
@@ -71,8 +71,8 @@ Write it as a single dense paragraph. Do NOT include scene actions, expressions,
 
   // Fallback: use the child description if available
   return childDescription
-    ? `A 3D Pixar/Disney animated child character named ${childName}, ${childDescription}`
-    : `A 3D Pixar/Disney animated child character named ${childName}`;
+    ? `A premium 3D animated child character named ${childName}, ${childDescription}`
+    : `A premium 3D animated child character named ${childName}`;
 }
 
 /**
@@ -129,7 +129,7 @@ export function scheduleVideoGeneration(orderId: number) {
 /**
  * Main video generation pipeline:
  * 1. Clone voice with ElevenLabs if voice sample exists (done ONCE, cached on order)
- * 2. Extract canonical character description from the Pixar image
+ * 2. Extract canonical character description from the generated character image
  * 3. Split story into scenes using LLM (with canonical description)
  * 4. Generate illustration for each scene (canonical description + scene prompt + reference image)
  * 5. Generate TTS narration for each scene (using cloned voice or ElevenLabs default)
@@ -234,7 +234,7 @@ async function processVideoGeneration(orderId: number) {
       return;
     }
 
-    // ─── Step 0.5: Extract canonical character description from Pixar image ──
+    // ─── Step 0.5: Extract canonical character description from generated character image ──
     const characterImageUrl = order.generatedImageUrl || order.originalImageUrl;
     let canonicalDescription = "";
     if (characterImageUrl) {
@@ -441,10 +441,10 @@ ${characterBlock}SCENE ILLUSTRATION:\n${scene.illustrationPrompt}
 CRITICAL RULES:
 1. The character in this scene MUST match the reference image EXACTLY — same face, hair, eyes, skin, clothing, proportions.
 2. Only change the character's pose, expression, and the background/setting.
-3. Style: High-quality 3D Pixar/Disney animation, children's storybook illustration, cinematic lighting, vibrant saturated colors, movie-quality render. G-rated and family-friendly.
+3. Style: High-quality premium 3D cinematic animation, children's storybook illustration, cinematic lighting, vibrant saturated colors, movie-quality render. G-rated and family-friendly.
 4. Do NOT add, remove, or change any clothing items or accessories from the character description above.
 5. All content must be completely child-safe, wholesome, and appropriate for a children's picture book.
-6. WIDESCREEN COMPOSITION: Frame this as a wide 16:9 cinematic landscape — like a still from a Pixar movie. The character should be positioned within a wide horizontal frame with a rich, detailed background extending to both sides. Do NOT use a portrait or square crop.`,
+6. WIDESCREEN COMPOSITION: Frame this as a wide 16:9 cinematic landscape — like a still from a premium animated movie. The character should be positioned within a wide horizontal frame with a rich, detailed background extending to both sides. Do NOT use a portrait or square crop.`,
       originalImages: [
         {
           url: characterImageUrl,

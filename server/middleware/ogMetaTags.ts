@@ -100,7 +100,7 @@ async function fetchShareData(shareToken: string): Promise<OgData> {
   const title = `${escapeHtml(childName)}'s ${escapeHtml(themeLabel)} Storybook | KidzRstarz`;
 
   // Create a short description from the story (first 160 chars)
-  let description = `Watch ${escapeHtml(childName)}'s magical Pixar-style animated storybook — a personalized ${themeLabel.toLowerCase()} story with narration and music!`;
+  let description = `Watch ${escapeHtml(childName)}'s magical 3D animated storybook — a personalized ${themeLabel.toLowerCase()} story with narration and music!`;
   if (order.story) {
     const storyPreview = order.story.substring(0, 150).replace(/\n/g, " ").trim();
     description = `${escapeHtml(storyPreview)}${order.story.length > 150 ? "..." : ""}`;
@@ -152,7 +152,7 @@ function buildDefaultOgTags(req: Request): string {
   return buildOgTags({
     title: "KidzRstarz — Where Every Kid Becomes a Star",
     description:
-      "Transform your child into a Pixar-style character with a personalized animated storybook featuring narration and music!",
+      "Transform your child into a stunning 3D animated character with a personalized storybook featuring narration and music!",
     imageUrl: LOGO_URL,
     url: req.originalUrl,
   });

@@ -13,9 +13,9 @@
  *     prompt: "A serene landscape with mountains"
  *   });
  *
- * For editing (Pixar character generation):
+ * For editing (animated character generation):
  *   const { url: imageUrl } = await generateImage({
- *     prompt: "Transform into Pixar character",
+ *     prompt: "Transform into 3D animated character",
  *     originalImages: [{ url: "https://...", mimeType: "image/jpeg" }]
  *   });
  */

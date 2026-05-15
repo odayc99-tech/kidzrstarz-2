@@ -15,8 +15,8 @@ export async function processStoryGeneration(orderId: number): Promise<void> {
 
     // Generate the story (include child description and theme for accuracy)
     const characterDesc = order.childDescription
-      ? `a magical 3D Pixar-style character who ${order.childDescription}`
-      : "a magical 3D Pixar-style character";
+      ? `a magical 3D animated character who ${order.childDescription}`
+      : "a magical 3D animated character";
 
     const story = await generateStory({
       childName: order.childName || "Your Character",

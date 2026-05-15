@@ -55,7 +55,7 @@ export async function cloneVoiceWithElevenLabs(
     // Step 2: Upload to ElevenLabs for instant voice cloning
     const FormData = (await import("form-data")).default;
     const form = new FormData();
-    form.append("name", `PixarMagic-${voiceName}-${nanoid(6)}`);
+    form.append("name", `KidzRstarz-${voiceName}-${nanoid(6)}`);
     form.append("description", `Cloned voice for children's storybook narration - ${voiceName}`);
     form.append("files", sampleBuffer, {
       filename: "voice-sample.webm",

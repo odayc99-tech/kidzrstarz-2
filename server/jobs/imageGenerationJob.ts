@@ -31,7 +31,7 @@ export async function processImageGeneration(orderId: number): Promise<void> {
       status: "processing",
     });
 
-    // Generate the Pixar character image (with child description for accuracy)
+    // Generate the 3D animated character image (with child description for accuracy)
     const { imageUrl, imageKey } = await generatePixarCharacter(
       order.originalImageUrl,
       order.childName || "Child",
@@ -61,7 +61,7 @@ export async function processImageGeneration(orderId: number): Promise<void> {
     // Notify owner of successful generation (non-blocking — don't let notification failure corrupt order status)
     notifyOwner({
       title: `KidzRstarz: Image Generated (Order #${orderId})`,
-      content: `User received their Pixar character image for order #${orderId}.${updatedOrder?.storyApproved ? ' Video generation started.' : ' Awaiting story approval for video.'}`,
+      content: `User received their 3D animated character image for order #${orderId}.${updatedOrder?.storyApproved ? ' Video generation started.' : ' Awaiting story approval for video.'}`,
     }).catch((e) => console.warn(`[Job] Failed to notify owner for order ${orderId}:`, e));
   } catch (error) {
     console.error(`[Job] Error processing image generation for order ${orderId}:`, error);
