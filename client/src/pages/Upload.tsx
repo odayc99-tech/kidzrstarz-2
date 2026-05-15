@@ -299,7 +299,7 @@ export default function UploadPage() {
             </Button>
           </Link>
           <h1 className="text-xl font-bold text-slate-900">
-            Create Your Pixar Character
+            Create Your Animated Character
           </h1>
         </div>
       </div>

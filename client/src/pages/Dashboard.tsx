@@ -228,7 +228,7 @@ export default function DashboardPage() {
                     <div className="flex items-start justify-between mb-4">
                       <div>
                         <h3 className="text-lg font-bold text-slate-900">
-                          {order.childName}'s Pixar Character
+                          {order.childName}'s Animated Character
                         </h3>
                         <p className="text-sm text-slate-500">
                           Order #{order.id} &middot;{" "}

@@ -442,7 +442,7 @@ export default function CheckoutPage() {
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
                   <Sparkles className="w-5 h-5 text-purple-600" />
-                  Pixar Character Preview
+                  Animated Character Preview
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -493,7 +493,7 @@ export default function CheckoutPage() {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-600">Product</span>
-                    <span className="font-medium">Pixar Character</span>
+                    <span className="font-medium">Animated Character</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-600">Status</span>
