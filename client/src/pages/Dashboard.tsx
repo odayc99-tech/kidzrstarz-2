@@ -166,7 +166,7 @@ export default function DashboardPage() {
             Welcome back, {user?.name || "there"}!
           </h2>
           <p className="text-slate-600">
-            View and manage your Pixar character transformations.
+            View and manage your animated character storybooks.
           </p>
         </div>
 

@@ -732,7 +732,7 @@ export default function CheckoutPage() {
                         className="mt-0.5 w-5 h-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 flex-shrink-0 cursor-pointer"
                       />
                       <span className="text-sm text-slate-700 leading-relaxed">
-                        I understand that <strong>all sales are final</strong>. I have reviewed my Pixar character preview and personalized story, and I confirm that I am satisfied with the results before proceeding to payment.
+                        I understand that <strong>all sales are final</strong>. I have reviewed my animated character preview and personalized story, and I confirm that I am satisfied with the results before proceeding to payment.
                       </span>
                     </label>
 

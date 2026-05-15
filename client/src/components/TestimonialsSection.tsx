@@ -35,7 +35,7 @@ export default function TestimonialsSection() {
             Loved by Families
           </h2>
           <p className="text-xl text-slate-600 max-w-2xl mx-auto">
-            See how parents and children are creating magical Pixar memories.
+            See how parents and children are creating magical animated storybook memories.
             Click on any image to see the transformation!
           </p>
         </div>
@@ -159,7 +159,7 @@ export default function TestimonialsSection() {
                 AI-Powered Quality
               </h4>
               <p className="text-slate-600">
-                Advanced AI transforms photos into stunning Pixar-style artwork.
+                Advanced AI transforms photos into stunning animated artwork.
               </p>
             </div>
 

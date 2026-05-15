@@ -106,7 +106,7 @@ export default function GallerySection() {
             in Action
           </h2>
           <p className="text-xl text-slate-600 max-w-2xl mx-auto">
-            Every child becomes the hero of their own Pixar-style story. Here are some of our favorite transformations.
+            Every child becomes the hero of their own magical story. Here are some of our favorite transformations.
           </p>
         </div>
 
@@ -123,7 +123,7 @@ export default function GallerySection() {
               <div className="aspect-[3/4] overflow-hidden">
                 <img
                   src={item.imageUrl}
-                  alt={`${item.name}'s Pixar transformation - ${item.theme} theme`}
+                  alt={`${item.name}'s animated character - ${item.theme} theme`}
                   className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                   loading="lazy"
                 />
