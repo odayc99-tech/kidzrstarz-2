@@ -443,7 +443,8 @@ CRITICAL RULES:
 2. Only change the character's pose, expression, and the background/setting.
 3. Style: High-quality 3D Pixar/Disney animation, children's storybook illustration, cinematic lighting, vibrant saturated colors, movie-quality render. G-rated and family-friendly.
 4. Do NOT add, remove, or change any clothing items or accessories from the character description above.
-5. All content must be completely child-safe, wholesome, and appropriate for a children's picture book.`,
+5. All content must be completely child-safe, wholesome, and appropriate for a children's picture book.
+6. WIDESCREEN COMPOSITION: Frame this as a wide 16:9 cinematic landscape — like a still from a Pixar movie. The character should be positioned within a wide horizontal frame with a rich, detailed background extending to both sides. Do NOT use a portrait or square crop.`,
       originalImages: [
         {
           url: characterImageUrl,
