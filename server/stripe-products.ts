@@ -7,7 +7,7 @@ export const PRODUCTS = {
   PIXAR_TRANSFORMATION: {
     name: "3D Animated Character Storybook",
     description: "Transform your child's photo into a stunning 3D animated character in a personalized storybook video",
-    priceInCents: 2999, // $29.99
+    priceInCents: 1999, // $19.99
     currency: "usd",
   },
 } as const;

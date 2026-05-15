@@ -224,7 +224,7 @@ export default function Home() {
                       onClick={() => openSignIn()}
                     >
                       <Wand2 className="mr-2 w-5 h-5" />
-                      Start the Magic - $29.99
+                      Start the Magic - $19.99
                     </Button>
                 )}
                 <a href="#how-it-works">

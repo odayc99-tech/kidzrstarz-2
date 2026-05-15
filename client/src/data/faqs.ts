@@ -107,7 +107,7 @@ export const faqs: FAQ[] = [
     category: "Account & Usage",
     question: "Can I create multiple animated characters?",
     answer:
-      "Yes! You can create as many animated character images as you'd like. Each image is $29.99. There's no limit to how many you can create. You'll have access to all your previous orders in your dashboard.",
+      "Yes! You can create as many animated character images as you'd like. Each image is $19.99. There's no limit to how many you can create. You'll have access to all your previous orders in your dashboard.",
   },
   {
     id: "account-2",

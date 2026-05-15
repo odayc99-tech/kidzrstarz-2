@@ -856,7 +856,7 @@ function StripeCheckoutButton({
       ) : (
         <>
           <CreditCard className="w-5 h-5 mr-2" />
-          Pay $29.99
+          Pay $19.99
         </>
       )}
     </Button>
