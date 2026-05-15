@@ -59,7 +59,7 @@ export interface StoryGenerationOptions {
 export async function generateStory(options: StoryGenerationOptions): Promise<string> {
   const {
     childName,
-    characterDescription = "a magical 3D animated character",
+    characterDescription = "a magical animated character",
     theme = "adventure",
   } = options;
 
