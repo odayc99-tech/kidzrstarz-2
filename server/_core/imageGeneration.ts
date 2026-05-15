@@ -125,7 +125,7 @@ async function generateImageViaOpenAI(
     const form = new FormData();
     form.append("prompt", options.prompt);
     form.append("model", "gpt-image-1");
-    form.append("size", "1792x1024");
+    form.append("size", "1536x1024");
 
     for (const img of options.originalImages!) {
       let buf: Buffer;
@@ -176,7 +176,7 @@ async function generateImageViaOpenAI(
         model: "gpt-image-1",
         prompt: options.prompt,
         response_format: "b64_json",
-        size: "1792x1024",
+        size: "1536x1024",
       }),
     });
     if (!response.ok) {
