@@ -71,8 +71,8 @@ export default function Home() {
             {isAuthenticated ? (
               <div className="flex items-center gap-3">
                 <Link href="/dashboard">
-                  <Button variant="outline" size="sm" className="border-purple-200 text-purple-700 hover:bg-purple-50">
-                    Dashboard
+                  <Button variant="outline" size="sm" className="border-purple-200 text-purple-700 hover:bg-purple-50 hidden sm:inline-flex">
+                    My Account
                   </Button>
                 </Link>
                 <Link href="/upload">
@@ -86,11 +86,11 @@ export default function Home() {
               </div>
             ) : (
               <div className="flex items-center gap-3">
-                <Link href="/my-orders">
+                <a href={getLoginUrl()}>
                   <Button variant="outline" size="sm" className="border-purple-200 text-purple-700 hover:bg-purple-50 hidden sm:inline-flex">
-                    My Orders
+                    My Account
                   </Button>
-                </Link>
+                </a>
                 <Link href="/upload">
                   <Button
                     size="sm"
@@ -203,7 +203,7 @@ export default function Home() {
 
               <p className="text-lg md:text-xl text-purple-100 mb-8 max-w-xl mx-auto lg:mx-0 leading-relaxed">
                 Upload your child's photo and watch AI create a{" "}
-                <span className="text-yellow-300 font-semibold">stunning Pixar-style character</span>,
+                <span className="text-yellow-300 font-semibold">stunning animated character</span>,
                 a personalized story, and an{" "}
                 <span className="text-pink-300 font-semibold">animated storybook</span> with narration
                 and music!
@@ -269,7 +269,7 @@ export default function Home() {
                 {/* Logo image */}
                 <img
                   src={LOGO_URL}
-                  alt="KidzRstarz - Magical Pixar-style character transformations"
+                  alt="KidzRstarz - Magical animated character transformations"
                   className="relative w-full rounded-3xl shadow-2xl border-4 border-white/20"
                   style={{
                     animation: "heroFloat 6s ease-in-out infinite",
@@ -355,7 +355,7 @@ export default function Home() {
               Happens
             </h2>
             <p className="text-xl text-slate-600 max-w-2xl mx-auto">
-              Three simple steps to transform your child into a Pixar character
+              Three simple steps to transform your child into a magical animated character
             </p>
           </div>
 
@@ -387,7 +387,7 @@ export default function Home() {
                 </div>
                 <h3 className="text-xl font-bold text-slate-900 mb-3">AI Transformation</h3>
                 <p className="text-slate-600">
-                  Our AI generates a stunning 3D Pixar-style character, a personalized story, and an animated storybook.
+                  Our AI generates a stunning animated character, a personalized story, and an animated storybook.
                 </p>
               </CardContent>
             </Card>
@@ -434,7 +434,7 @@ export default function Home() {
                 gradient: "from-purple-500 to-indigo-500",
                 bg: "bg-purple-50",
                 title: "AI-Powered",
-                desc: "State-of-the-art AI creates stunning Pixar-quality character transformations.",
+                desc: "State-of-the-art AI creates stunning movie-quality animated character transformations.",
               },
               {
                 icon: <Clock className="w-6 h-6 text-white" />,
@@ -528,7 +528,7 @@ export default function Home() {
               <CardContent className="p-8">
                 <ul className="space-y-4">
                   {[
-                    { text: "3D Pixar-style character transformation", emoji: "🎨" },
+                    { text: "Stunning animated character transformation", emoji: "🎨" },
                     { text: "Personalized AI-generated story", emoji: "📖" },
                     { text: "Animated storybook with narration", emoji: "🎬" },
                     { text: "Theme-matched background music", emoji: "🎵" },

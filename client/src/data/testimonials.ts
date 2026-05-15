@@ -19,7 +19,7 @@ export const testimonials: Testimonial[] = [
     name: "Sarah Johnson",
     role: "Parent",
     content:
-      "My daughter was amazed when she saw herself as a Pixar character! The quality is absolutely incredible. This is now her favorite picture of herself. Highly recommend!",
+      "My daughter was amazed when she saw herself as an animated character! The quality is absolutely incredible. This is now her favorite picture of herself. Highly recommend!",
     rating: 5,
     childName: "Emma",
     beforeImage:
@@ -71,7 +71,7 @@ export const testimonials: Testimonial[] = [
     name: "Amanda Wilson",
     role: "Parent",
     content:
-      "Perfect gift for my kids! They thought it was so cool seeing themselves as Pixar characters. The quality exceeded my expectations. Definitely ordering again!",
+      "Perfect gift for my kids! They thought it was so cool seeing themselves as animated characters. The quality exceeded my expectations. Definitely ordering again!",
     rating: 5,
     childName: "Olivia & Liam",
     beforeImage:
@@ -84,7 +84,7 @@ export const testimonials: Testimonial[] = [
     name: "Robert Garcia",
     role: "Parent",
     content:
-      "Incredible AI technology! The transformation is seamless and the Pixar style is spot-on. My son wants to frame his and put it in his room. Highly impressed!",
+      "Incredible AI technology! The transformation is seamless and the animation style is spot-on. My son wants to frame his and put it in his room. Highly impressed!",
     rating: 5,
     childName: "Diego",
     beforeImage:

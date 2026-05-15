@@ -157,7 +157,7 @@ export default function StorybookPage() {
     const childName = order.childName || "character";
     const safeName = childName.replace(/[^a-zA-Z0-9]/g, "_").toLowerCase();
     const proxyUrl = `/api/download/${orderId}/character`;
-    await downloadFile(order.generatedImageUrl, `${safeName}_pixar_character.png`, proxyUrl);
+    await downloadFile(order.generatedImageUrl, `${safeName}_animated_character.png`, proxyUrl);
     toast.success("Character image downloaded!");
     setDownloading(null);
   }, [order, orderId]);
@@ -500,7 +500,7 @@ export default function StorybookPage() {
                   <p className="text-xs text-purple-300/60 mt-3 text-center">
                     {allScenesCompleted
                       ? "Create a full storybook video with narration and background music right in your browser, or download the high-res character image."
-                      : "Download your high-res Pixar character image. Video creation will be available once all scenes are generated."}
+                      : "Download your high-res animated character image. Video creation will be available once all scenes are generated."}
                   </p>
                 </CardContent>
               </Card>

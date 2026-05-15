@@ -15,30 +15,30 @@ export const faqs: FAQ[] = [
     category: "Privacy & Security",
     question: "Is my child's photo secure and private?",
     answer:
-      "Yes, absolutely. Your photos are encrypted during transmission and storage. We never share your photos with third parties, and they are only used to generate your Pixar character image. After processing, original photos are securely deleted from our servers within 30 days.",
+      "Yes, absolutely. Your photos are encrypted during transmission and storage. We never share your photos with third parties, and they are only used to generate your animated character image. After processing, original photos are securely deleted from our servers within 30 days.",
   },
   {
     id: "privacy-2",
     category: "Privacy & Security",
     question: "What happens to my photos after I download the result?",
     answer:
-      "Once you download your Pixar character image, the original photo is automatically deleted from our servers within 30 days. The generated image is yours to keep forever. We don't retain any copies of your original photos.",
+      "Once you download your animated character image, the original photo is automatically deleted from our servers within 30 days. The generated image is yours to keep forever. We don't retain any copies of your original photos.",
   },
   {
     id: "privacy-3",
     category: "Privacy & Security",
     question: "Can you use my photos for training or other purposes?",
     answer:
-      "No. We strictly use your photos only to generate your personalized Pixar character image. Your photos are never used for AI model training, marketing, or any other purpose. Your privacy is our top priority.",
+      "No. We strictly use your photos only to generate your personalized animated character image. Your photos are never used for AI model training, marketing, or any other purpose. Your privacy is our top priority.",
   },
 
   // Turnaround Time
   {
     id: "turnaround-1",
     category: "Turnaround Time",
-    question: "How long does it take to generate my Pixar character?",
+    question: "How long does it take to generate my animated character?",
     answer:
-      "Most Pixar character images are generated within 5-15 minutes. The preview is generated almost instantly, and the high-resolution final image typically takes 10-20 minutes depending on server load. You'll receive an email notification when your image is ready.",
+      "Most animated character images are generated within 5-15 minutes. The preview is generated almost instantly, and the high-resolution final image typically takes 10-20 minutes depending on server load. You'll receive an email notification when your image is ready.",
   },
   {
     id: "turnaround-2",
@@ -75,7 +75,7 @@ export const faqs: FAQ[] = [
     category: "Payments",
     question: "Do I pay before or after seeing my character?",
     answer:
-      "You always see a preview of your Pixar character before paying. We generate the preview for free so you can review and confirm you're happy with the result. Payment is only required to unlock the full high-resolution image and personalized story.",
+      "You always see a preview of your animated character before paying. We generate the preview for free so you can review and confirm you're happy with the result. Payment is only required to unlock the full high-resolution image and personalized story.",
   },
 
   // Technical & Quality
@@ -91,23 +91,23 @@ export const faqs: FAQ[] = [
     category: "Technical & Quality",
     question: "What photo quality do I need for best results?",
     answer:
-      "For best results, upload a clear, well-lit photo with your child's face clearly visible. A straight-on angle works best. We can work with most photos, but clear, high-quality photos produce the best Pixar character transformations.",
+      "For best results, upload a clear, well-lit photo with your child's face clearly visible. A straight-on angle works best. We can work with most photos, but clear, high-quality photos produce the best animated character results.",
   },
   {
     id: "quality-3",
     category: "Technical & Quality",
     question: "Can I use the image for commercial purposes?",
     answer:
-      "The generated Pixar character image is for personal use only. Commercial use, resale, or redistribution is not permitted. If you're interested in commercial licensing, please contact our team for special arrangements.",
+      "The generated animated character image is for personal use only. Commercial use, resale, or redistribution is not permitted. If you're interested in commercial licensing, please contact our team for special arrangements.",
   },
 
   // Account & Usage
   {
     id: "account-1",
     category: "Account & Usage",
-    question: "Can I create multiple Pixar characters?",
+    question: "Can I create multiple animated characters?",
     answer:
-      "Yes! You can create as many Pixar character images as you'd like. Each image is $29.99. There's no limit to how many you can create. You'll have access to all your previous orders in your dashboard.",
+      "Yes! You can create as many animated character images as you'd like. Each image is $29.99. There's no limit to how many you can create. You'll have access to all your previous orders in your dashboard.",
   },
   {
     id: "account-2",
