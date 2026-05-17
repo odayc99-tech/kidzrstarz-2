@@ -516,7 +516,7 @@ export default function Home() {
                   Complete Storybook Package
                 </h3>
                 <div className="flex items-baseline justify-center gap-1">
-                  <span className="text-5xl font-bold">$29</span>
+                  <span className="text-5xl font-bold">$19</span>
                   <span className="text-2xl">.99</span>
                 </div>
                 <p className="mt-2 text-white/80">per character</p>
