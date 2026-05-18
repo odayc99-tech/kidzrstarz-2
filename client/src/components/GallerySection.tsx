@@ -190,7 +190,7 @@ export default function GallerySection() {
                           <Button
                 size="lg"
                 className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-lg px-8 py-6 shadow-lg hover:shadow-xl transition-all"
-              > onClick={() => openSignIn()}
+               onClick={() => openSignIn()}>
                 Create Your Child's Character
                 <ArrowRight className="ml-2 w-5 h-5" />
               </Button>

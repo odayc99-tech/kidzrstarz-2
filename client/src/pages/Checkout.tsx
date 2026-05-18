@@ -238,7 +238,7 @@ export default function CheckoutPage() {
               We couldn't find this order. If you created it on another device, please sign in to access it.
             </p>
             <div className="space-y-3">
-                              <Button className="w-full bg-gradient-to-r from-blue-600 to-purple-600"> onClick={() => openSignIn()}
+                              <Button className="w-full bg-gradient-to-r from-blue-600 to-purple-600" onClick={() => openSignIn()}>
                   Sign In
                 </Button>
               <Link href="/upload">
@@ -360,7 +360,7 @@ export default function CheckoutPage() {
               <UserPlus className="w-4 h-4 inline mr-1.5 -mt-0.5" />
               <span className="font-medium">Create an account</span> to save your orders and access them from any device.
             </p>
-                          <Button variant="outline" size="sm" className="border-blue-300 text-blue-700 hover:bg-blue-100 whitespace-nowrap"> onClick={() => openSignIn()}
+                          <Button variant="outline" size="sm" className="border-blue-300 text-blue-700 hover:bg-blue-100 whitespace-nowrap" onClick={() => openSignIn()}>
                 Sign In / Sign Up
               </Button>
           </div>

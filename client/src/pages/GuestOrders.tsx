@@ -120,7 +120,7 @@ export default function GuestOrdersPage() {
               variant="outline"
               size="sm"
               className="border-purple-300 text-purple-700 hover:bg-purple-100 whitespace-nowrap"
-            > onClick={() => openSignIn()}
+             onClick={() => openSignIn()}>
               Sign In / Sign Up
             </Button>
         </div>
@@ -184,7 +184,7 @@ export default function GuestOrdersPage() {
                                   <Button
                     variant="outline"
                     className="border-purple-300 text-purple-700"
-                  > onClick={() => openSignIn()}
+                   onClick={() => openSignIn()}>
                     Sign In
                   </Button>
                 <Link href="/upload">

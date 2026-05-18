@@ -311,7 +311,7 @@ export default function UploadPage() {
               <UserPlus className="w-4 h-4 inline mr-1.5 -mt-0.5" />
               <span className="font-medium">Create an account</span> to save your orders and access them later from any device.
             </p>
-                          <Button variant="outline" size="sm" className="border-blue-300 text-blue-700 hover:bg-blue-100 whitespace-nowrap"> onClick={() => openSignIn()}
+                          <Button variant="outline" size="sm" className="border-blue-300 text-blue-700 hover:bg-blue-100 whitespace-nowrap" onClick={() => openSignIn()}>
                 Sign In / Sign Up
               </Button>
           </div>
