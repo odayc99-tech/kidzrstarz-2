@@ -5,7 +5,7 @@ export { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 // ensures the sign-in modal always works regardless of build environment.
 export const CLERK_PUBLISHABLE_KEY =
   import.meta.env.VITE_CLERK_PUBLISHABLE_KEY ||
-  "pk_test_bXV0dWFsLWRvcnktMzcuY2xlcmsuYWNjb3VudHMuZGV2JA";
+  "pk_live_Y2xlcmsua2lkenJzdGFyei5jb20k";
 
 // Kept for any legacy references — Clerk modal is now used instead.
 export const getLoginUrl = () => "#";
