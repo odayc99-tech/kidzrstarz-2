@@ -215,8 +215,9 @@ export default function CheckoutPage() {
     });
   };
 
-  // Waiting for auth to resolve (brief)
-  if (authLoading) {
+  // Waiting for auth to resolve — skip this block for guest users who already have a
+  // guestToken so the checkout page is never blocked by Clerk initialisation.
+  if (authLoading && !guestToken) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-purple-50">
         <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
