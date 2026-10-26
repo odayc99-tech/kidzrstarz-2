@@ -28,6 +28,7 @@ RUN pnpm install --frozen-lockfile
 FROM deps AS builder
 COPY . .
 # Build frontend (Vite → dist/public) + server (esbuild → dist/index.js)
+ARG VITE_CLERK_PUBLISHABLE_KEY
 RUN pnpm run build
 
 # ── Production image ──────────────────────────────────────────────────────────
