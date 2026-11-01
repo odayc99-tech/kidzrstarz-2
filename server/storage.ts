@@ -1,6 +1,5 @@
 /**
  * Storage helpers — AWS S3 (kidzrstarz-upload bucket)
- *
  * The bucket has a public-read policy on all objects, so we use direct
  * public URLs instead of pre-signed URLs. This means URLs never expire
  * and the download button always works regardless of when the order was created.
@@ -16,8 +15,19 @@
 import {
   S3Client,
   PutObjectCommand,
+  GetObjectCommand,
   HeadBucketCommand,
 } from "@aws-sdk/client-s3";
+import {
+  S3Client,
+  PutObjectCommand,
+  GetObjectCommand,
+  HeadBucketCommand,
+} from "@aws-sdk/client-s3";
+
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { withRetry } from "./services/retry";
+
 import { withRetry } from "./services/retry";
 
 // ─── Client factory ──────────────────────────────────────────────────────────
@@ -130,6 +140,42 @@ export async function storageGet(
   const key = normalizeKey(relKey);
   const url = storagePublicUrl(key);
   return { key, url };
+}
+/**
+ * Read a private object using the server's configured AWS credentials.
+ * Accepts a stored object key, not a URL. Server use only.
+ */
+export async function storageReadBytes(
+  relKey: string
+): Promise<{ key: string; data: Buffer; contentType?: string }> {
+  const key = normalizeKey(relKey);
+  if (!key) {
+    throw new Error("An S3 object key is required");
+  }
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(key)) {
+    throw new Error("Use an S3 object key, not a URL");
+  }
+
+  const bucket = getBucket();
+  const client = getS3Client();
+
+  try {
+    const result = await client.send(
+      new GetObjectCommand({ Bucket: bucket, Key: key }),
+      { abortSignal: AbortSignal.timeout(30_000) }
+    );
+
+    if (!result.Body) {
+      throw new Error("S3 returned no file data");
+    }
+
+    const data = Buffer.from(await result.Body.transformToByteArray());
+    return { key, data, contentType: result.ContentType };
+ } finally {
+    client.destroy();
+  }
+// Keep image links stable while the order page polls for progress.
+const signedLinkCache = new Map<string, { url: string; expiresAt: number }>();
 }
 
 /**
