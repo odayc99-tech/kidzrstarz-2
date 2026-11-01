@@ -1,5 +1,6 @@
 /**
  * Storage helpers — AWS S3 (kidzrstarz-upload bucket)
+ *
  * The bucket has a public-read policy on all objects, so we use direct
  * public URLs instead of pre-signed URLs. This means URLs never expire
  * and the download button always works regardless of when the order was created.
@@ -18,16 +19,7 @@ import {
   GetObjectCommand,
   HeadBucketCommand,
 } from "@aws-sdk/client-s3";
-import {
-  S3Client,
-  PutObjectCommand,
-  GetObjectCommand,
-  HeadBucketCommand,
-} from "@aws-sdk/client-s3";
-
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { withRetry } from "./services/retry";
-
 import { withRetry } from "./services/retry";
 
 // ─── Client factory ──────────────────────────────────────────────────────────
@@ -141,6 +133,7 @@ export async function storageGet(
   const url = storagePublicUrl(key);
   return { key, url };
 }
+
 /**
  * Read a private object using the server's configured AWS credentials.
  * Accepts a stored object key, not a URL. Server use only.
@@ -171,11 +164,62 @@ export async function storageReadBytes(
 
     const data = Buffer.from(await result.Body.transformToByteArray());
     return { key, data, contentType: result.ContentType };
- } finally {
+  } finally {
     client.destroy();
   }
+}
+
 // Keep image links stable while the order page polls for progress.
 const signedLinkCache = new Map<string, { url: string; expiresAt: number }>();
+
+/**
+ * Create a temporary link to a private object. Server use only.
+ * Call only after checking order access; do not save this URL in the database.
+ */
+export async function storageGetSignedUrl(
+  relKey: string,
+  expiresIn = 600
+): Promise<{ key: string; url: string }> {
+  const key = normalizeKey(relKey);
+  if (!key) {
+    throw new Error("An S3 object key is required");
+  }
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(key)) {
+    throw new Error("Use an S3 object key, not a URL");
+  }
+  if (!Number.isInteger(expiresIn) || expiresIn < 1 || expiresIn > 3600) {
+    throw new Error("Signed-link expiry must be 1 to 3600 whole seconds");
+  }
+
+  const bucket = getBucket();
+  const client = getS3Client();
+
+  try {
+    const cacheKey = JSON.stringify([
+      getRegion(), bucket, process.env.AWS_ACCESS_KEY_ID, key, expiresIn,
+    ]);
+    const now = Date.now();
+    const cached = signedLinkCache.get(cacheKey);
+    if (cached && cached.expiresAt - now > 60_000) {
+      return { key, url: cached.url };
+    }
+
+    const url = await getSignedUrl(
+      client,
+      new GetObjectCommand({ Bucket: bucket, Key: key }),
+      { expiresIn }
+    );
+
+    signedLinkCache.delete(cacheKey);
+    if (signedLinkCache.size >= 500) {
+      const oldest = signedLinkCache.keys().next().value;
+      if (oldest !== undefined) signedLinkCache.delete(oldest);
+    }
+    signedLinkCache.set(cacheKey, { url, expiresAt: now + expiresIn * 1000 });
+    return { key, url };
+  } finally {
+    client.destroy();
+  }
 }
 
 /**
