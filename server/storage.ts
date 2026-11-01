@@ -1,9 +1,10 @@
 /**
- * Storage helpers — AWS S3 (kidzrstarz-upload bucket)
+ * Storage helpers — AWS S3, selected by the server's S3_BUCKET/S3_REGION.
  *
- * The bucket has a public-read policy on all objects, so we use direct
- * public URLs instead of pre-signed URLs. This means URLs never expire
- * and the download button always works regardless of when the order was created.
+ * Legacy URL helpers retain their existing behavior for compatibility. An
+ * unsigned URL does not grant access to a private object or change its ACL.
+ * Private preview jobs use storageReadBytes; authorized order responses use
+ * storageGetSignedUrl. Never change the bucket's public-access settings here.
  *
  * Public URL format: https://{bucket}.s3.{region}.amazonaws.com/{key}
  *

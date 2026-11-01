@@ -52,6 +52,8 @@ export default function CheckoutPage() {
   const [editedStory, setEditedStory] = useState("");
   const [paymentPending, setPaymentPending] = useState(false);
   const [savingStory, setSavingStory] = useState(false);
+  const [originalImageFailed, setOriginalImageFailed] = useState(false);
+  const [previewImageFailed, setPreviewImageFailed] = useState(false);
 
   // Get guest token for this order: first from localStorage, then from URL params as fallback
   const urlGuestToken = searchParams.get("guestToken");
@@ -94,7 +96,8 @@ export default function CheckoutPage() {
       refetchInterval: (query) => {
         const data = query.state.data;
         if (!data) return false;
-        if (!data.previewImageUrl && data.status === "pending") return 3000;
+        if (data.previewGenerating) return 3000;
+        if (!data.previewImageUrl && !data.previewError && !data.previewImageAccessError && data.status === "pending") return 3000;
         if (!data.story) return 3000;
         if (data.status === "processing") return 5000;
         if (data.paymentStatus === "paid" && data.status !== "completed" && data.status !== "failed") {
@@ -104,6 +107,29 @@ export default function CheckoutPage() {
       },
     }
   );
+
+  useEffect(() => {
+    setOriginalImageFailed(false);
+  }, [order?.originalImageUrl]);
+  useEffect(() => {
+    setPreviewImageFailed(false);
+  }, [order?.previewImageUrl]);
+
+  const retryPreviewMutation = trpc.orders.retryPreview.useMutation({
+    onSuccess: (data) => {
+      toast.info(data.message);
+      refetch();
+    },
+    onError: (error) => toast.error(error.message || "Unable to retry the preview."),
+  });
+  const handleRefreshImages = () => {
+    setOriginalImageFailed(false);
+    setPreviewImageFailed(false);
+    void refetch();
+  };
+  const handleRetryPreview = () => {
+    retryPreviewMutation.mutate({ orderId, guestToken: guestToken || undefined });
+  };
 
   // Show toast for payment result from Stripe redirect
   useEffect(() => {
@@ -386,11 +412,24 @@ export default function CheckoutPage() {
               </CardHeader>
               <CardContent>
                 <div className="aspect-square rounded-lg overflow-hidden bg-slate-100">
-                  <img
-                    src={order.originalImageUrl ?? undefined}
-                    alt="Original"
-                    className="w-full h-full object-cover"
-                  />
+                  {order.originalImageUrl && !originalImageFailed ? (
+                    <img
+                      src={order.originalImageUrl}
+                      alt="Original"
+                      className="w-full h-full object-cover"
+                      onError={() => setOriginalImageFailed(true)}
+                    />
+                  ) : (
+                    <div className="h-full flex flex-col items-center justify-center text-center p-5 gap-3" role="status">
+                      <AlertCircle className="w-8 h-8 text-amber-600" />
+                      <p className="text-sm text-slate-600">
+                        {order.originalImageAccessError || "The original photo could not be loaded. Please refresh to try again."}
+                      </p>
+                      <Button variant="outline" size="sm" onClick={handleRefreshImages}>
+                        <RefreshCw className="w-4 h-4 mr-2" />Refresh images
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -404,12 +443,13 @@ export default function CheckoutPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {order.previewImageUrl ? (
+                {order.previewImageUrl && !previewImageFailed ? (
                   <div className="aspect-square rounded-lg overflow-hidden bg-slate-100 relative">
                     <img
                       src={order.previewImageUrl}
                       alt="Preview"
                       className="w-full h-full object-cover"
+                      onError={() => setPreviewImageFailed(true)}
                     />
                     {order.paymentStatus !== "paid" && (
                       <div className="absolute inset-0 bg-black/10 flex items-end justify-center pb-4">
@@ -421,14 +461,36 @@ export default function CheckoutPage() {
                   </div>
                 ) : (
                   <div className="aspect-square rounded-lg bg-slate-100 flex items-center justify-center">
-                    <div className="text-center">
-                      <Loader2 className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-3" />
-                      <p className="text-slate-600 text-sm">
-                        Generating preview...
-                      </p>
-                      <p className="text-slate-400 text-xs mt-1">
-                        This usually takes 1-3 minutes
-                      </p>
+                    <div className="text-center p-5" role="status">
+                      {order.previewGenerating ? (
+                        <>
+                          <Loader2 className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-3" />
+                          <p className="text-slate-600 text-sm">Generating preview...</p>
+                          <p className="text-slate-400 text-xs mt-1">This usually takes 1-3 minutes</p>
+                        </>
+                      ) : (
+                        <>
+                          <AlertCircle className="w-8 h-8 text-amber-600 mx-auto mb-3" />
+                          <p className="text-slate-600 text-sm">
+                            {order.previewError || order.previewImageAccessError || (previewImageFailed
+                              ? "The preview image could not be loaded. Please refresh to try again."
+                              : "Your preview is not ready yet. Refresh its status or retry below.")}
+                          </p>
+                        </>
+                      )}
+                      <div className="flex flex-wrap gap-2 justify-center mt-4">
+                        <Button variant="outline" size="sm" onClick={handleRefreshImages}>
+                          <RefreshCw className="w-4 h-4 mr-2" />Refresh status
+                        </Button>
+                        {order.paymentStatus === "unpaid" && !order.previewImageKey && (
+                          <Button size="sm" onClick={handleRetryPreview} disabled={retryPreviewMutation.isPending || order.previewGenerating}>
+                            Retry preview
+                          </Button>
+                        )}
+                      </div>
+                      {order.paymentStatus === "unpaid" && !order.previewImageKey && !order.previewGenerating && (
+                        <p className="text-slate-400 text-xs mt-2">Retry starts a new preview-generation attempt.</p>
+                      )}
                     </div>
                   </div>
                 )}

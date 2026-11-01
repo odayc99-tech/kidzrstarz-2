@@ -16,12 +16,12 @@ import {
 } from "../db";
 import { storyScenes, orders } from "../../drizzle/schema";
 import { eq, asc, desc, sql, and, isNotNull, not } from "drizzle-orm";
-import { storagePut, storageGet, storagePublicUrl } from "../storage";
+import { storagePut, storageGet, storagePublicUrl, storageGetSignedUrl } from "../storage";
 import { S3Client, HeadObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { nanoid } from "nanoid";
 import { PRODUCTS } from "../stripe-products";
-import { schedulePreviewGeneration } from "../jobs/previewGenerationJob";
+import { schedulePreviewGeneration, isPreviewGenerating } from "../jobs/previewGenerationJob";
 import { scheduleStoryGeneration } from "../jobs/storyGenerationJob";
 import { scheduleVideoGeneration, isVideoGenerating } from "../jobs/videoGenerationJob";
 import { getAvailableVoices } from "../services/ttsService";
@@ -81,6 +81,9 @@ async function verifyOrderAccess(
     message: "Order not found or unauthorized",
   });
 }
+
+// Manual preview retries only; bounded memory and no automatic generation on polling.
+const previewRetryTimes = new Map<number, number>();
 
 export const ordersRouter = router({
   /**
@@ -298,20 +301,67 @@ export const ordersRouter = router({
         }
       }
 
-      // Build public S3 URLs from stored keys (bucket has public-read policy, URLs never expire)
-      const originalImageUrl = refreshUrl(order.originalImageKey, order.originalImageUrl);
+      // Order ownership/guest access was verified above. Never sign arbitrary client keys.
+      // Link failures should not hide the successfully generated story or the whole order.
+      let originalImageAccessError: string | null = null;
+      let previewImageAccessError: string | null = null;
+      const signImage = async (key: string | null | undefined, kind: "original" | "preview") => {
+        if (!key) return null;
+        try {
+          return (await storageGetSignedUrl(key)).url;
+        } catch {
+          const message = "This image is temporarily unavailable. Please refresh to try again.";
+          if (kind === "original") originalImageAccessError = message;
+          else previewImageAccessError = message;
+          return null;
+        }
+      };
+      const originalImageUrl = await signImage(order.originalImageKey, "original");
       const generatedImageUrl = refreshUrl(order.generatedImageKey, order.generatedImageUrl);
-      const previewImageUrl = refreshUrl(order.previewImageKey, order.previewImageUrl);
+      const previewImageUrl = await signImage(order.previewImageKey, "preview");
       const videoUrl = refreshUrl(order.videoKey, order.videoUrl);
+      const previewError = order.errorMessage?.startsWith("Preview: ")
+        ? order.errorMessage.slice("Preview: ".length)
+        : null;
       return {
         ...order,
         originalImageUrl,
         generatedImageUrl,
         previewImageUrl,
         videoUrl,
+        originalImageAccessError,
+        previewImageAccessError,
+        previewError,
+        previewGenerating: isPreviewGenerating(input.orderId),
         videoGenerating: isVideoGenerating(input.orderId),
         errorMessage: order.errorMessage || null,
       };
+    }),
+
+  /** Explicit recovery for an existing unpaid preview; never accepts an S3 key. */
+  retryPreview: publicProcedure
+    .input(z.object({ orderId: z.number().int().positive(), guestToken: z.string().optional() }))
+    .mutation(async ({ ctx, input }) => {
+      const order = await verifyOrderAccess(input.orderId, ctx.user?.id, input.guestToken);
+      if (order.paymentStatus !== "unpaid") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Preview retry is only available before payment." });
+      }
+      if (order.previewImageKey || isPreviewGenerating(input.orderId)) {
+        return { scheduled: false, message: "The preview is ready or already being generated." };
+      }
+      const now = Date.now();
+      const previous = previewRetryTimes.get(input.orderId);
+      if (previous !== undefined && now - previous < 60_000) {
+        throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Please wait one minute before retrying this preview." });
+      }
+      previewRetryTimes.delete(input.orderId);
+      if (previewRetryTimes.size >= 500) {
+        const oldest = previewRetryTimes.keys().next().value;
+        if (oldest !== undefined) previewRetryTimes.delete(oldest);
+      }
+      previewRetryTimes.set(input.orderId, now);
+      await schedulePreviewGeneration(input.orderId);
+      return { scheduled: true, message: "Preview generation has been queued." };
     }),
 
   /**
@@ -1168,4 +1218,3 @@ export const ordersRouter = router({
       return { downloadUrl, filename };
     }),
 });
-

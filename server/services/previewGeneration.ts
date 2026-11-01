@@ -1,5 +1,5 @@
 import { generateImage } from "../_core/imageGeneration";
-import { storagePut } from "../storage";
+import { storagePut, storageReadBytes } from "../storage";
 import { nanoid } from "nanoid";
 import { applyWatermark } from "./watermark";
 import { getStorageNamespace } from "./storageNamespace";
@@ -8,15 +8,17 @@ import { getStorageNamespace } from "./storageNamespace";
  * Generate a low-resolution preview of the 3D animated character.
  * Used for checkout preview before payment.
  * The prompt is crafted to ensure a true 3D animated transformation.
- * 
+ *
  * @param childDescription - Optional description of the child to improve accuracy.
+ * @param originalImageKey - Optional private storage key for the original image.
  */
 export async function generatePreviewImage(
   originalImageUrl: string,
   childName: string,
   userId: number | null,
   orderId: number,
-  childDescription?: string | null
+  childDescription?: string | null,
+  originalImageKey?: string | null
 ): Promise<{ imageUrl: string; imageKey: string }> {
   try {
     console.log(`[PreviewGeneration] Starting preview generation for ${childName}`);
@@ -45,27 +47,37 @@ Character name: ${childName}`;
     const result = await generateImage({
       prompt,
       originalImages: [
-        {
-          url: originalImageUrl,
-          mimeType: "image/jpeg",
-        },
+        originalImageKey
+          ? {
+              storageKey: originalImageKey,
+              mimeType: "image/jpeg",
+            }
+          : {
+              url: originalImageUrl,
+              mimeType: "image/jpeg",
+            },
       ],
     });
 
-    if (!result.url) {
-      throw new Error("Preview image generation returned no URL");
+    let generatedBuffer: Buffer;
+    if (result.key) {
+      // Results stored by generateImage stay private; read their bytes directly.
+      // A key is authoritative, so do not downgrade to its URL if this read fails.
+      const generatedImage = await storageReadBytes(result.key);
+      generatedBuffer = generatedImage.data;
+    } else if (result.url) {
+      // Support legacy/external providers that return only a URL.
+      const response = await fetch(result.url);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch preview image: ${response.statusText}`);
+      }
+      generatedBuffer = Buffer.from(await response.arrayBuffer());
+    } else {
+      throw new Error("Preview image generation returned no image");
     }
-
-    // Download the generated preview and upload to S3
-    const response = await fetch(result.url);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch preview image: ${response.statusText}`);
-    }
-
-    const buffer = await response.arrayBuffer();
 
     // Apply KidzRstarz watermark to preview image (content protection)
-    const watermarkedBuffer = await applyWatermark(Buffer.from(buffer));
+    const watermarkedBuffer = await applyWatermark(generatedBuffer);
 
     // Upload watermarked preview to S3
     const ns = getStorageNamespace(userId, orderId);
