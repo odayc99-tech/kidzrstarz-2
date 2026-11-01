@@ -169,8 +169,9 @@ async function generateImageViaOpenAI(
     // edits endpoint — multipart/form-data
     const form = new FormData();
     form.append("prompt", options.prompt);
-    form.append("model", "gpt-image-1");
+    form.append("model", ENV.openAiImageModel);
     form.append("size", "1536x1024");
+    form.append("output_format", "png");
 
     for (const img of originalImages) {
       let buf: Buffer;
@@ -218,9 +219,9 @@ async function generateImageViaOpenAI(
         authorization: `Bearer ${ENV.openAiApiKey}`,
       },
       body: JSON.stringify({
-        model: "gpt-image-1",
+        model: ENV.openAiImageModel,
         prompt: options.prompt,
-        response_format: "b64_json",
+        output_format: "png",
         size: "1536x1024",
       }),
     });

@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
     forgeApiKey: "",
     openAiApiKey: "",
     openAiBaseUrl: "https://api.openai.com/v1",
+    openAiImageModel: "gpt-image-2.5-sunburst",
   },
   storagePut: vi.fn(),
   storageReadBytes: vi.fn(),
@@ -41,6 +42,7 @@ describe("imageGeneration private-original repair", () => {
       forgeApiKey: "",
       openAiApiKey: "",
       openAiBaseUrl: "https://api.openai.com/v1",
+      openAiImageModel: "gpt-image-2.5-sunburst",
     });
     mocks.storagePut.mockResolvedValue({
       key: "generated/canonical-output.png",
@@ -55,7 +57,7 @@ describe("imageGeneration private-original repair", () => {
     globalThis.fetch = originalFetch;
   });
 
-  it("uses authenticated storage bytes and their MIME type for an OpenAI edit", async () => {
+  it("uses authenticated storage bytes and their MIME type for a default-model OpenAI edit", async () => {
     Object.assign(mocks.env, { openAiApiKey: "test-openai-key" });
     mocks.storageReadBytes.mockResolvedValue({
       key: "orders/22/original.webp",
@@ -66,6 +68,10 @@ describe("imageGeneration private-original repair", () => {
     const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
       expect(url).toBe("https://api.openai.com/v1/images/edits");
       const form = init?.body as FormData;
+      expect(form.get("model")).toBe("gpt-image-2.5-sunburst");
+      expect(form.get("size")).toBe("1536x1024");
+      expect(form.get("output_format")).toBe("png");
+      expect(form.has("response_format")).toBe(false);
       const uploadedImage = form.get("image[]") as Blob;
       expect(uploadedImage.type).toBe("image/webp");
       expect(Buffer.from(await uploadedImage.arrayBuffer()).toString()).toBe(
@@ -98,6 +104,97 @@ describe("imageGeneration private-original repair", () => {
     expect(mocks.storagePut).toHaveBeenCalledWith(
       expect.stringMatching(/^generated\/\d+\.png$/),
       Buffer.from("generated-image"),
+      "image/png"
+    );
+  });
+
+  it("uses the default model and PNG output format for OpenAI JSON generations", async () => {
+    Object.assign(mocks.env, { openAiApiKey: "test-openai-key" });
+
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      expect(url).toBe("https://api.openai.com/v1/images/generations");
+      const payload = JSON.parse(String(init?.body));
+      expect(payload).toMatchObject({
+        model: "gpt-image-2.5-sunburst",
+        prompt: "safe generation prompt",
+        size: "1536x1024",
+        output_format: "png",
+      });
+      expect(payload).not.toHaveProperty("response_format");
+      return providerResponse({
+        data: [{ b64_json: Buffer.from("generated-json-image").toString("base64") }],
+      });
+    });
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    await expect(generateImage({ prompt: "safe generation prompt" })).resolves.toEqual({
+      key: "generated/canonical-output.png",
+      url: "https://private.example/generated/canonical-output.png",
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(mocks.storagePut).toHaveBeenCalledWith(
+      expect.stringMatching(/^generated\/\d+\.png$/),
+      Buffer.from("generated-json-image"),
+      "image/png"
+    );
+  });
+
+  it("forwards an explicitly configured image model for both OpenAI edits and generations", async () => {
+    Object.assign(mocks.env, {
+      openAiApiKey: "test-openai-key",
+      openAiImageModel: "compatible-image-model",
+    });
+
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url.endsWith("/images/edits")) {
+        const form = init?.body as FormData;
+        expect(form.get("model")).toBe("compatible-image-model");
+        expect(form.get("size")).toBe("1536x1024");
+        expect(form.get("output_format")).toBe("png");
+        expect(form.has("response_format")).toBe(false);
+        return providerResponse({
+          data: [{ b64_json: Buffer.from("alternate-edit-image").toString("base64") }],
+        });
+      }
+
+      expect(url).toBe("https://api.openai.com/v1/images/generations");
+      const payload = JSON.parse(String(init?.body));
+      expect(payload).toMatchObject({
+        model: "compatible-image-model",
+        prompt: "alternate generation prompt",
+        size: "1536x1024",
+        output_format: "png",
+      });
+      expect(payload).not.toHaveProperty("response_format");
+      return providerResponse({
+        data: [{ b64_json: Buffer.from("alternate-generation-image").toString("base64") }],
+      });
+    });
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    await generateImage({
+      prompt: "alternate edit prompt",
+      originalImages: [
+        {
+          b64Json: Buffer.from("alternate-edit-source").toString("base64"),
+          mimeType: "image/png",
+        },
+      ],
+    });
+    await generateImage({ prompt: "alternate generation prompt" });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(mocks.storagePut).toHaveBeenNthCalledWith(
+      1,
+      expect.stringMatching(/^generated\/\d+\.png$/),
+      Buffer.from("alternate-edit-image"),
+      "image/png"
+    );
+    expect(mocks.storagePut).toHaveBeenNthCalledWith(
+      2,
+      expect.stringMatching(/^generated\/\d+\.png$/),
+      Buffer.from("alternate-generation-image"),
       "image/png"
     );
   });
