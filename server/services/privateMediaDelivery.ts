@@ -1,6 +1,7 @@
 import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { storageGetSignedUrl } from "../storage";
+import { ensureCompatibleVideoKey } from "./videoCompatibility";
 
 /** Server callers must verify order ownership or the paid share token first. */
 export async function privateMediaUrl(
@@ -29,12 +30,16 @@ export async function privateDownloadUrl(key: string, filename: string, contentT
   if (!region || !bucket || !accessKeyId || !secretAccessKey) {
     throw new Error("Storage not configured");
   }
+  // Compatibility work happens only after the caller's order/share authorization.
+  const downloadKey = contentType === "video/mp4"
+    ? await ensureCompatibleVideoKey(normalizedKey)
+    : normalizedKey;
   const safeFilename = filename.replace(/[^a-zA-Z0-9._-]/g, "-");
   const client = new S3Client({ region, credentials: { accessKeyId, secretAccessKey } });
   try {
     const downloadUrl = await getSignedUrl(client, new GetObjectCommand({
       Bucket: bucket,
-      Key: normalizedKey,
+      Key: downloadKey,
       ResponseContentDisposition: `attachment; filename="${safeFilename}"`,
       ResponseContentType: contentType,
     }), { expiresIn: 300 });

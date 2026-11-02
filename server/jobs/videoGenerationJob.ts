@@ -628,7 +628,7 @@ async function composeFullVideo(orderId: number, userId: number | null, storyThe
   // Upload to S3 and persist the key returned by storage, never a locally
   // assumed destination key.
   const ns = getStorageNamespace(userId, orderId);
-  const requestedVideoKey = `${ns}/videos/${nanoid()}-storybook.mp4`;
+  const requestedVideoKey = `${ns}/videos/${nanoid()}-storybook-h264420.mp4`;
   const uploadedVideo = await storagePut(requestedVideoKey, videoBuffer, "video/mp4");
   if (!uploadedVideo.key) {
     throw new Error("Video upload completed without a canonical storage key");

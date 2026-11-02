@@ -159,7 +159,7 @@ export async function composeStorybookVideo(
           `zoompan=z='min(zoom+0.0005,1.04)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${Math.ceil(duration * 25)}:s=1920x1080:fps=25[v];` +
           `[1:a]apad=pad_dur=${Math.ceil(duration)}[a]` +
           `" -map "[v]" -map "[a]" ` +
-          `-c:v libx264 -preset fast -crf 23 -c:a aac -b:a 128k ` +
+          `-c:v libx264 -preset fast -crf 23 -pix_fmt yuv420p -profile:v high -level:v 4.1 -c:a aac -b:a 128k -movflags +faststart ` +
           `-t ${duration.toFixed(2)} -shortest "${clipPath}"`,
           { timeout: 120000 }
         );
@@ -171,7 +171,7 @@ export async function composeStorybookVideo(
           `[0:v]scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2:black,` +
           `zoompan=z='min(zoom+0.0005,1.04)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${Math.ceil(duration * 25)}:s=1920x1080:fps=25[v]` +
           `" -map "[v]" -map 1:a ` +
-          `-c:v libx264 -preset fast -crf 23 -c:a aac -b:a 128k ` +
+          `-c:v libx264 -preset fast -crf 23 -pix_fmt yuv420p -profile:v high -level:v 4.1 -c:a aac -b:a 128k -movflags +faststart ` +
           `-t ${duration.toFixed(2)} "${clipPath}"`,
           { timeout: 120000 }
         );
@@ -188,7 +188,7 @@ export async function composeStorybookVideo(
 
     const concatPath = path.join(tmpDir, "concat.mp4");
     await execAsync(
-      `ffmpeg -y -f concat -safe 0 -i "${concatListPath}" -c copy "${concatPath}"`,
+      `ffmpeg -y -f concat -safe 0 -i "${concatListPath}" -c copy -movflags +faststart "${concatPath}"`,
       { timeout: 120000 }
     );
     console.log(`[VideoCompose] Concatenated ${clipPaths.length} clips`);
@@ -218,7 +218,7 @@ export async function composeStorybookVideo(
         `[1:a]volume=0.15[bgm];` +
         `[0:a][bgm]amix=inputs=2:duration=first:dropout_transition=2[aout]` +
         `" -map 0:v -map "[aout]" ` +
-        `-c:v copy -c:a aac -b:a 192k ` +
+        `-c:v copy -c:a aac -b:a 192k -movflags +faststart ` +
         `-t ${totalDuration.toFixed(2)} "${finalPath}"`,
         { timeout: 180000 }
       );

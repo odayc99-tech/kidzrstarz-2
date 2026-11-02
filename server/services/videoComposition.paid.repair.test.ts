@@ -141,4 +141,23 @@ describe("videoComposition paid private-S3 repair", () => {
     expect(fetchMock.mock.calls[0][0]).toBe("https://legacy.invalid/scene.png");
     vi.unstubAllGlobals();
   });
+
+  it("exports narrated and silent clips in standard H.264 4:2:0 with fast-start metadata", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(okResponse()));
+    await composeStorybookVideo([
+      { sceneIndex: 0, illustrationKey: "7/scene.png", narrationKey: "7/audio.mp3" },
+      { sceneIndex: 1, illustrationKey: "7/silent.png" },
+    ], "adventure");
+    const commands = mocks.exec.mock.calls.map(call => String(call[0]));
+    const clipCommands = commands.filter(command => command.includes("-c:v libx264"));
+    expect(clipCommands).toHaveLength(2);
+    for (const command of clipCommands) {
+      expect(command).toContain("-pix_fmt yuv420p");
+      expect(command).toContain("-profile:v high -level:v 4.1");
+      expect(command).toContain("-c:a aac");
+      expect(command).toContain("-movflags +faststart");
+    }
+    expect(commands.find(command => command.includes("-f concat"))).toContain("-movflags +faststart");
+    vi.unstubAllGlobals();
+  });
 });
