@@ -18,7 +18,7 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { toast } from "sonner";
-import { StoryPlayer } from "@/components/StoryPlayer";
+import { StoryPlayer, type MusicSelection } from "@/components/StoryPlayer";
 import { useState, useCallback, useMemo } from "react";
 import { getGuestToken, saveGuestToken } from "@/lib/guestToken";
 import { downloadFile } from "@/lib/downloadFile";
@@ -26,7 +26,10 @@ import { downloadFile } from "@/lib/downloadFile";
 export default function StorybookPage() {
   const { user, isAuthenticated, loading: authLoading, openSignIn } = useAuth();
   const searchString = useSearch();
-  const params = useMemo(() => new URLSearchParams(searchString), [searchString]);
+  const params = useMemo(
+    () => new URLSearchParams(searchString),
+    [searchString]
+  );
   const orderId = parseInt(params.get("orderId") || "0");
   const [justCopied, setJustCopied] = useState(false);
   const [downloading, setDownloading] = useState<string | null>(null);
@@ -73,19 +76,21 @@ export default function StorybookPage() {
       toast.success("Video generation started! Scenes will appear shortly.");
       refetchScenes();
     },
-    onError: (err) => {
+    onError: err => {
       toast.error(err.message);
     },
   });
 
   const regenerateStorybook = trpc.orders.regenerateStorybookStory.useMutation({
     onSuccess: () => {
-      toast.success("Storybook regeneration started! A new story and scenes will be generated.");
+      toast.success(
+        "Storybook regeneration started! A new story and scenes will be generated."
+      );
       setShowRegenConfirm(false);
       refetchOrder();
       refetchScenes();
     },
-    onError: (err) => {
+    onError: err => {
       toast.error(err.message);
       setShowRegenConfirm(false);
     },
@@ -93,17 +98,20 @@ export default function StorybookPage() {
 
   // Share link is only available for logged-in users
   const generateShareLink = trpc.orders.generateShareLink.useMutation({
-    onSuccess: (data) => {
+    onSuccess: data => {
       const fullUrl = `${window.location.origin}${data.shareUrl}`;
-      navigator.clipboard.writeText(fullUrl).then(() => {
-        toast.success("Share link copied to clipboard!");
-      }).catch(() => {
-        toast.success(`Share link: ${fullUrl}`);
-      });
+      navigator.clipboard
+        .writeText(fullUrl)
+        .then(() => {
+          toast.success("Share link copied to clipboard!");
+        })
+        .catch(() => {
+          toast.success(`Share link: ${fullUrl}`);
+        });
       setJustCopied(true);
       setTimeout(() => setJustCopied(false), 2000);
     },
-    onError: (err) => {
+    onError: err => {
       toast.error(err.message);
     },
   });
@@ -114,16 +122,23 @@ export default function StorybookPage() {
     }
   };
 
-  const getCharacterDownloadUrl = trpc.orders.getCharacterDownloadUrl.useMutation();
+  const getCharacterDownloadUrl =
+    trpc.orders.getCharacterDownloadUrl.useMutation();
   const handleDownloadCharacter = useCallback(async () => {
     if (!order?.generatedImageUrl) return;
     setDownloading("character");
     try {
-      const { downloadUrl, filename } = await getCharacterDownloadUrl.mutateAsync({ orderId, guestToken: guestToken || undefined });
+      const { downloadUrl, filename } =
+        await getCharacterDownloadUrl.mutateAsync({
+          orderId,
+          guestToken: guestToken || undefined,
+        });
       await downloadFile(downloadUrl, filename);
       toast.success("Character image download started.");
     } catch {
-      toast.error("Unable to download this image. Please refresh and try again.");
+      toast.error(
+        "Unable to download this image. Please refresh and try again."
+      );
     } finally {
       setDownloading(null);
     }
@@ -137,7 +152,9 @@ export default function StorybookPage() {
     // videoKey is the canonical signal that the server-composed MP4 exists.
     // A viewing URL can be unavailable temporarily while its authorized download remains valid.
     if (!order?.videoKey) {
-      toast.info("Your final MP4 is still being prepared. Refreshing its status...");
+      toast.info(
+        "Your final MP4 is still being prepared. Refreshing its status..."
+      );
       void refetchOrder();
       return;
     }
@@ -154,7 +171,9 @@ export default function StorybookPage() {
       toast.success("Storybook video downloaded!");
     } catch (err: any) {
       console.error("Video download failed:", err);
-      toast.error(`Video download failed: ${err.message || "Unknown error"}. Please try again.`);
+      toast.error(
+        `Video download failed: ${err.message || "Unknown error"}. Please try again.`
+      );
     } finally {
       setDownloading(null);
       setVideoStatus("");
@@ -192,14 +211,21 @@ export default function StorybookPage() {
               Storybook Not Found
             </h2>
             <p className="text-slate-400 mb-6">
-              We couldn't find this storybook. If you created it on another device, please sign in to access it.
+              We couldn't find this storybook. If you created it on another
+              device, please sign in to access it.
             </p>
             <div className="space-y-3">
-                              <Button className="w-full bg-gradient-to-r from-purple-600 to-pink-600" onClick={() => openSignIn()}>
-                  Sign In
-                </Button>
+              <Button
+                className="w-full bg-gradient-to-r from-purple-600 to-pink-600"
+                onClick={() => openSignIn()}
+              >
+                Sign In
+              </Button>
               <Link href="/upload">
-                <Button variant="outline" className="w-full border-slate-600 text-slate-300">
+                <Button
+                  variant="outline"
+                  className="w-full border-slate-600 text-slate-300"
+                >
                   Create New Story
                 </Button>
               </Link>
@@ -221,7 +247,10 @@ export default function StorybookPage() {
             </h2>
             <p className="text-slate-400 mb-6">No order ID provided.</p>
             <Link href={isAuthenticated ? "/dashboard" : "/"}>
-              <Button variant="outline" className="border-slate-600 text-slate-300">
+              <Button
+                variant="outline"
+                className="border-slate-600 text-slate-300"
+              >
                 {isAuthenticated ? "Go to Dashboard" : "Go Home"}
               </Button>
             </Link>
@@ -232,15 +261,24 @@ export default function StorybookPage() {
   }
 
   const allScenesCompleted =
-    scenes && scenes.length > 0 && scenes.every((s) => s.status === "completed");
+    scenes && scenes.length > 0 && scenes.every(s => s.status === "completed");
   const hasScenes = scenes && scenes.length > 0;
-  const completedSceneCount = scenes?.filter(
-    (s) => s.status === "completed" && s.illustrationUrl
-  ).length || 0;
+  const completedSceneCount =
+    scenes?.filter(s => s.status === "completed" && s.illustrationUrl).length ||
+    0;
   const hasVideoKey = Boolean(order?.videoKey);
-  const videoViewingUnavailable = hasVideoKey && Boolean(order?.videoAccessError);
+  const videoViewingUnavailable =
+    hasVideoKey && Boolean(order?.videoAccessError);
   // Keep the existing regeneration guard for any already-running recovery.
   const narrationRetryInProgress = Boolean(order?.narrationRetryPending);
+  // These fields are absent only on legacy order responses. The explicit
+  // undefined/null distinction reaches StoryPlayer unchanged.
+  const musicResponse = order as
+    | {
+        musicSelection?: MusicSelection | null;
+        musicAccessError?: string | null;
+      }
+    | undefined;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
@@ -261,7 +299,9 @@ export default function StorybookPage() {
             <div className="flex items-center gap-2">
               <Film className="w-5 h-5 text-purple-400" />
               <h1 className="text-lg font-bold text-white">
-                {order?.childName ? `${order.childName}'s Storybook` : "Animated Storybook"}
+                {order?.childName
+                  ? `${order.childName}'s Storybook`
+                  : "Animated Storybook"}
               </h1>
             </div>
           </div>
@@ -295,7 +335,12 @@ export default function StorybookPage() {
             {order?.paymentStatus === "paid" && !hasScenes && (
               <Button
                 size="sm"
-                onClick={() => triggerVideo.mutate({ orderId, guestToken: guestToken || undefined })}
+                onClick={() =>
+                  triggerVideo.mutate({
+                    orderId,
+                    guestToken: guestToken || undefined,
+                  })
+                }
                 disabled={triggerVideo.isPending}
                 className="bg-gradient-to-r from-purple-600 to-pink-600"
               >
@@ -329,11 +374,17 @@ export default function StorybookPage() {
           <div className="container flex items-center justify-between py-2.5 gap-3">
             <p className="text-sm text-purple-200">
               <UserPlus className="w-4 h-4 inline mr-1.5 -mt-0.5" />
-              <span className="font-medium">Create an account</span> to save your storybooks and share them with family.
+              <span className="font-medium">Create an account</span> to save
+              your storybooks and share them with family.
             </p>
-                          <Button variant="outline" size="sm" className="border-purple-400/50 text-purple-200 hover:bg-purple-800/50 whitespace-nowrap" onClick={() => openSignIn()}>
-                Sign In / Sign Up
-              </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-purple-400/50 text-purple-200 hover:bg-purple-800/50 whitespace-nowrap"
+              onClick={() => openSignIn()}
+            >
+              Sign In / Sign Up
+            </Button>
           </div>
         </div>
       )}
@@ -360,85 +411,101 @@ export default function StorybookPage() {
               scenes={scenes || []}
               childName={order?.childName || "Child"}
               storyTheme={order?.storyTheme}
+              musicSelection={musicResponse?.musicSelection}
+              musicError={musicResponse?.musicAccessError}
               isLoading={false}
             />
 
             {/* Download Section - only for paid orders with completed content */}
-            {order?.paymentStatus === "paid" && (order?.generatedImageUrl || allScenesCompleted) && (
-              <Card className="bg-gradient-to-r from-purple-900/50 to-pink-900/50 border-purple-500/30">
-                <CardContent className="pt-6">
-                  <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                    <Download className="w-5 h-5 text-purple-400" />
-                    Download Your Content
-                  </h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {/* Download Character Image */}
-                    {order.generatedImageUrl && (
-                      <Button
-                        onClick={handleDownloadCharacter}
-                        disabled={downloading === "character"}
-                        className="w-full bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white h-auto py-3"
-                      >
-                        {downloading === "character" ? (
-                          <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                        ) : (
-                          <ImageIcon className="w-5 h-5 mr-2" />
-                        )}
-                        <div className="text-left">
-                          <div className="font-semibold">Animated Character</div>
-                          <div className="text-xs opacity-75">High-res PNG image</div>
-                        </div>
-                      </Button>
-                    )}
+            {order?.paymentStatus === "paid" &&
+              (order?.generatedImageUrl || allScenesCompleted) && (
+                <Card className="bg-gradient-to-r from-purple-900/50 to-pink-900/50 border-purple-500/30">
+                  <CardContent className="pt-6">
+                    <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                      <Download className="w-5 h-5 text-purple-400" />
+                      Download Your Content
+                    </h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {/* Download Character Image */}
+                      {order.generatedImageUrl && (
+                        <Button
+                          onClick={handleDownloadCharacter}
+                          disabled={downloading === "character"}
+                          className="w-full bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white h-auto py-3"
+                        >
+                          {downloading === "character" ? (
+                            <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                          ) : (
+                            <ImageIcon className="w-5 h-5 mr-2" />
+                          )}
+                          <div className="text-left">
+                            <div className="font-semibold">
+                              Animated Character
+                            </div>
+                            <div className="text-xs opacity-75">
+                              High-res PNG image
+                            </div>
+                          </div>
+                        </Button>
+                      )}
 
-                    {/* Download the server-composed MP4 only after its canonical key is available. */}
-                    {allScenesCompleted && (
-                      <Button
-                        onClick={handleDownloadVideo}
-                        disabled={downloading === "video" || !hasVideoKey}
-                        className="w-full bg-gradient-to-r from-pink-600 to-pink-700 hover:from-pink-700 hover:to-pink-800 text-white h-auto py-3 relative overflow-hidden"
-                      >
-                        {downloading === "video" ? (
-                          <>
-                            <div className="relative flex items-center w-full">
-                              <Loader2 className="w-5 h-5 mr-2 animate-spin flex-shrink-0" />
-                              <div className="text-left min-w-0">
-                                <div className="font-semibold">Downloading MP4</div>
-                                <div className="text-xs opacity-75 truncate">{videoStatus}</div>
+                      {/* Download the server-composed MP4 only after its canonical key is available. */}
+                      {allScenesCompleted && (
+                        <Button
+                          onClick={handleDownloadVideo}
+                          disabled={downloading === "video" || !hasVideoKey}
+                          className="w-full bg-gradient-to-r from-pink-600 to-pink-700 hover:from-pink-700 hover:to-pink-800 text-white h-auto py-3 relative overflow-hidden"
+                        >
+                          {downloading === "video" ? (
+                            <>
+                              <div className="relative flex items-center w-full">
+                                <Loader2 className="w-5 h-5 mr-2 animate-spin flex-shrink-0" />
+                                <div className="text-left min-w-0">
+                                  <div className="font-semibold">
+                                    Downloading MP4
+                                  </div>
+                                  <div className="text-xs opacity-75 truncate">
+                                    {videoStatus}
+                                  </div>
+                                </div>
                               </div>
-                            </div>
-                          </>
-                        ) : (
-                          <>
-                            <Film className="w-5 h-5 mr-2" />
-                            <div className="text-left">
-                              <div className="font-semibold">{hasVideoKey ? "Download MP4" : "Preparing MP4"}</div>
-                              <div className="text-xs opacity-75">
-                                {hasVideoKey
-                                  ? "MP4 with narration & music"
-                                  : "Your scenes are ready. Final MP4 preparation is in progress."}
+                            </>
+                          ) : (
+                            <>
+                              <Film className="w-5 h-5 mr-2" />
+                              <div className="text-left">
+                                <div className="font-semibold">
+                                  {hasVideoKey
+                                    ? "Download MP4"
+                                    : "Preparing MP4"}
+                                </div>
+                                <div className="text-xs opacity-75">
+                                  {hasVideoKey
+                                    ? "MP4 with narration & music"
+                                    : "Your scenes are ready. Final MP4 preparation is in progress."}
+                                </div>
                               </div>
-                            </div>
-                          </>
-                        )}
-                      </Button>
+                            </>
+                          )}
+                        </Button>
+                      )}
+                    </div>
+                    {videoViewingUnavailable && (
+                      <p className="text-xs text-purple-200/80 mt-3 text-center">
+                        {order?.videoAccessError} You can still download the
+                        completed MP4.
+                      </p>
                     )}
-                  </div>
-                  {videoViewingUnavailable && (
-                    <p className="text-xs text-purple-200/80 mt-3 text-center">
-                      {order?.videoAccessError} You can still download the completed MP4.
+                    <p className="text-xs text-purple-300/60 mt-3 text-center">
+                      {allScenesCompleted
+                        ? hasVideoKey
+                          ? "Download your completed storybook MP4 with narration and background music, or download the high-res character image."
+                          : "Your scenes are complete. The final MP4 is still being prepared; this page will update when it is ready to download."
+                        : "Download your high-res animated character image. Video creation will be available once all scenes are generated."}
                     </p>
-                  )}
-                  <p className="text-xs text-purple-300/60 mt-3 text-center">
-                    {allScenesCompleted
-                      ? hasVideoKey
-                        ? "Download your completed storybook MP4 with narration and background music, or download the high-res character image."
-                        : "Your scenes are complete. The final MP4 is still being prepared; this page will update when it is ready to download."
-                      : "Download your high-res animated character image. Video creation will be available once all scenes are generated."}
-                  </p>
-                </CardContent>
-              </Card>
-            )}
+                  </CardContent>
+                </Card>
+              )}
 
             {/* Regenerate Story Section - for paid orders */}
             {order?.paymentStatus === "paid" && allScenesCompleted && (
@@ -451,7 +518,8 @@ export default function StorybookPage() {
                         Want a Different Story?
                       </h3>
                       <p className="text-sm text-slate-400 mt-1">
-                        Regenerate with a brand new story and fresh scene illustrations.
+                        Regenerate with a brand new story and fresh scene
+                        illustrations.
                       </p>
                     </div>
                     {showRegenConfirm ? (
@@ -460,7 +528,10 @@ export default function StorybookPage() {
                           size="sm"
                           variant="ghost"
                           onClick={() => setShowRegenConfirm(false)}
-                          disabled={narrationRetryInProgress || regenerateStorybook.isPending}
+                          disabled={
+                            narrationRetryInProgress ||
+                            regenerateStorybook.isPending
+                          }
                           className="text-slate-400 hover:text-white"
                         >
                           Cancel
@@ -468,7 +539,10 @@ export default function StorybookPage() {
                         <Button
                           size="sm"
                           onClick={handleRegenerate}
-                          disabled={narrationRetryInProgress || regenerateStorybook.isPending}
+                          disabled={
+                            narrationRetryInProgress ||
+                            regenerateStorybook.isPending
+                          }
                           className="bg-amber-600 hover:bg-amber-700 text-white"
                         >
                           {regenerateStorybook.isPending ? (

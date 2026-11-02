@@ -65,6 +65,7 @@ vi.mock("../_core/notification", () => ({ notifyOwner: mocks.notifyOwner }));
 vi.mock("../services/videoComposition", () => ({ composeStorybookVideo: mocks.composeStorybookVideo }));
 vi.mock("../_core/llm", () => ({ invokeLLM: mocks.invokeLLM }));
 vi.mock("nanoid", () => ({ nanoid: vi.fn(() => "test-id") }));
+vi.mock("../services/musicAssets", () => ({ getOrderExperience: async () => null }));
 
 import { processVideoGeneration } from "./videoGenerationJob";
 

@@ -50,6 +50,7 @@ export interface StoryGenerationOptions {
   childName: string;
   characterDescription?: string;
   theme?: string;
+  themeDefinition?: { label: string; description: string; tone: string };
 }
 
 /**
@@ -63,7 +64,7 @@ export async function generateStory(options: StoryGenerationOptions): Promise<st
     theme = "adventure",
   } = options;
 
-  const themeInfo = STORY_THEMES[theme] || STORY_THEMES.adventure;
+  const themeInfo = options.themeDefinition || STORY_THEMES[theme] || STORY_THEMES.adventure;
 
   try {
     const prompt = `Create a fun, engaging 30-second children's story (approximately 100-150 words) featuring a character named "${childName}" who is ${characterDescription}.

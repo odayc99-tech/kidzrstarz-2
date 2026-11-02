@@ -5,6 +5,7 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
 import { ordersRouter } from "./routers/orders";
+import { themesRouter } from "./routers/themes";
 import { sdk } from "./_core/sdk";
 import { ENV } from "./_core/env";
 import * as db from "./db";
@@ -62,6 +63,7 @@ export const appRouter = router({
   }),
 
   orders: ordersRouter,
+  themes: themesRouter,
 });
 
 export type AppRouter = typeof appRouter;

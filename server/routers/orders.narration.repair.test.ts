@@ -10,6 +10,7 @@ vi.mock("../storage",()=>({storagePut:vi.fn(),storageGet:vi.fn(),storagePublicUr
 vi.mock("../services/privateMediaDelivery",()=>({privateMediaUrl:m.sign,privateDownloadUrl:vi.fn()}));
 vi.mock("../services/ttsService",()=>({getAvailableVoices:()=>[]}));
 vi.mock("../services/storyGeneration",()=>({getAvailableThemes:()=>[]}));
+vi.mock("../services/experienceCatalog",()=>({getOrderExperience:async()=>null,getPublicExperienceCatalog:vi.fn(),resolveNewOrderExperience:vi.fn(),saveOrderExperience:vi.fn()}));
 import {ordersRouter} from './orders';
 let order:any, serial=2000;
 const caller=(id:number|null=7)=>ordersRouter.createCaller({user:id===null?null:{id,role:'user'},req:{headers:{}},res:{}} as any);

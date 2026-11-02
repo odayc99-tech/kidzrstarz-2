@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ProgressBar, Step } from "@/components/ProgressBar";
+import {
+  ThemeMusicPicker,
+  type MusicSelection,
+} from "@/components/ThemeMusicPicker";
 import { Link, useLocation } from "wouter";
 import {
   Upload as UploadIcon,
@@ -27,11 +31,14 @@ import {
   Bone,
   Anchor,
   TreePine,
+  Snowflake,
+  Gift,
   UserPlus,
 } from "lucide-react";
 import { compressImage, formatBytes } from "@/lib/imageCompression";
 import { toast } from "sonner";
 import { saveGuestToken } from "@/lib/guestToken";
+import type { MusicPreset, PublicTheme } from "@shared/experienceCatalog";
 
 const STEPS: Step[] = [
   { id: "upload", label: "Upload Photo", description: "Choose a clear photo" },
@@ -40,22 +47,82 @@ const STEPS: Step[] = [
   { id: "processing", label: "Processing", description: "AI is working" },
 ];
 
-/**
- * Story theme options with icons and colors for the selector UI.
- */
-const THEME_OPTIONS = [
-  { id: "adventure", label: "Adventure", icon: Sparkles, color: "from-amber-500 to-orange-500", bgColor: "bg-amber-50 border-amber-200", activeColor: "bg-amber-100 border-amber-500 ring-2 ring-amber-300", description: "Exciting quests through magical lands" },
-  { id: "fairytale", label: "Fairy Tale", icon: Crown, color: "from-pink-500 to-rose-500", bgColor: "bg-pink-50 border-pink-200", activeColor: "bg-pink-100 border-pink-500 ring-2 ring-pink-300", description: "Enchanted forests & magical creatures" },
-  { id: "space", label: "Space Explorer", icon: Rocket, color: "from-indigo-500 to-blue-500", bgColor: "bg-indigo-50 border-indigo-200", activeColor: "bg-indigo-100 border-indigo-500 ring-2 ring-indigo-300", description: "Journey through the stars" },
-  { id: "underwater", label: "Underwater", icon: Fish, color: "from-cyan-500 to-teal-500", bgColor: "bg-cyan-50 border-cyan-200", activeColor: "bg-cyan-100 border-cyan-500 ring-2 ring-cyan-300", description: "Ocean adventures & sea creatures" },
-  { id: "superhero", label: "Superhero", icon: Shield, color: "from-red-500 to-rose-500", bgColor: "bg-red-50 border-red-200", activeColor: "bg-red-100 border-red-500 ring-2 ring-red-300", description: "Discover powers & save the day" },
-  { id: "dinosaur", label: "Dinosaur Land", icon: Bone, color: "from-green-500 to-emerald-500", bgColor: "bg-green-50 border-green-200", activeColor: "bg-green-100 border-green-500 ring-2 ring-green-300", description: "Travel back to prehistoric times" },
-  { id: "pirate", label: "Pirate Treasure", icon: Anchor, color: "from-yellow-600 to-amber-600", bgColor: "bg-yellow-50 border-yellow-200", activeColor: "bg-yellow-100 border-yellow-500 ring-2 ring-yellow-300", description: "Swashbuckling treasure hunts" },
-  { id: "enchantedForest", label: "Enchanted Forest", icon: TreePine, color: "from-emerald-500 to-green-600", bgColor: "bg-emerald-50 border-emerald-200", activeColor: "bg-emerald-100 border-emerald-500 ring-2 ring-emerald-300", description: "Talking animals & secret paths" },
-];
+const THEME_ICONS = {
+  sparkles: Sparkles,
+  crown: Crown,
+  rocket: Rocket,
+  fish: Fish,
+  shield: Shield,
+  bone: Bone,
+  anchor: Anchor,
+  tree: TreePine,
+  snowflake: Snowflake,
+  gift: Gift,
+  pumpkin: Sparkles,
+} as const;
+
+const THEME_COLORS: Record<
+  string,
+  { color: string; bgColor: string; activeColor: string }
+> = {
+  amber: {
+    color: "from-amber-500 to-orange-500",
+    bgColor: "bg-amber-50 border-amber-200",
+    activeColor: "bg-amber-100 border-amber-500 ring-2 ring-amber-300",
+  },
+  pink: {
+    color: "from-pink-500 to-rose-500",
+    bgColor: "bg-pink-50 border-pink-200",
+    activeColor: "bg-pink-100 border-pink-500 ring-2 ring-pink-300",
+  },
+  indigo: {
+    color: "from-indigo-500 to-blue-500",
+    bgColor: "bg-indigo-50 border-indigo-200",
+    activeColor: "bg-indigo-100 border-indigo-500 ring-2 ring-indigo-300",
+  },
+  cyan: {
+    color: "from-cyan-500 to-teal-500",
+    bgColor: "bg-cyan-50 border-cyan-200",
+    activeColor: "bg-cyan-100 border-cyan-500 ring-2 ring-cyan-300",
+  },
+  red: {
+    color: "from-red-500 to-rose-500",
+    bgColor: "bg-red-50 border-red-200",
+    activeColor: "bg-red-100 border-red-500 ring-2 ring-red-300",
+  },
+  green: {
+    color: "from-green-500 to-emerald-500",
+    bgColor: "bg-green-50 border-green-200",
+    activeColor: "bg-green-100 border-green-500 ring-2 ring-green-300",
+  },
+  yellow: {
+    color: "from-yellow-500 to-amber-500",
+    bgColor: "bg-yellow-50 border-yellow-200",
+    activeColor: "bg-yellow-100 border-yellow-500 ring-2 ring-yellow-300",
+  },
+  emerald: {
+    color: "from-emerald-500 to-green-600",
+    bgColor: "bg-emerald-50 border-emerald-200",
+    activeColor: "bg-emerald-100 border-emerald-500 ring-2 ring-emerald-300",
+  },
+};
+
+function defaultThemeId(themes: PublicTheme[]) {
+  return (
+    themes.find(theme => theme.id === "adventure")?.id ?? themes[0]?.id ?? ""
+  );
+}
+
+function defaultMusicForTheme(
+  theme: PublicTheme | undefined,
+  music: MusicPreset[]
+): MusicSelection {
+  const preset = music.find(entry => entry.id === theme?.defaultMusicId);
+  return preset?.available ? preset.id : "none";
+}
 
 export default function UploadPage() {
-  const { user, isAuthenticated, loading: authLoading, openSignIn } = useAuth();
+  const { isAuthenticated, loading: authLoading, openSignIn } = useAuth();
   const [, setLocation] = useLocation();
 
   const [currentStep, setCurrentStep] = useState(0);
@@ -64,6 +131,7 @@ export default function UploadPage() {
   const [childName, setChildName] = useState("");
   const [childDescription, setChildDescription] = useState("");
   const [storyTheme, setStoryTheme] = useState("adventure");
+  const [musicId, setMusicId] = useState<MusicSelection>("none");
   const [isUploading, setIsUploading] = useState(false);
   const [compressionInfo, setCompressionInfo] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
@@ -78,9 +146,18 @@ export default function UploadPage() {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const catalogInitializedRef = useRef(false);
+
+  const publicCatalogQuery = trpc.themes.listPublic.useQuery();
+  const publicCatalog = publicCatalogQuery.data as
+    | { revision: string; themes: PublicTheme[]; music: MusicPreset[] }
+    | undefined;
+  const publicThemes = publicCatalog?.themes ?? [];
+  const music = publicCatalog?.music ?? [];
+  const selectedTheme = publicThemes.find(theme => theme.id === storyTheme);
 
   const createOrderMutation = trpc.orders.createOrder.useMutation({
-    onSuccess: (data) => {
+    onSuccess: data => {
       toast.success("Order created! Generating your preview...");
       // Save guest token if returned (guest user)
       if (data.guestToken) {
@@ -96,7 +173,7 @@ export default function UploadPage() {
         : `/checkout?orderId=${data.orderId}`;
       setLocation(checkoutUrl);
     },
-    onError: (error) => {
+    onError: error => {
       toast.error(error.message || "Failed to create order");
       setIsUploading(false);
       setCurrentStep(2);
@@ -107,10 +184,34 @@ export default function UploadPage() {
     onSuccess: () => {
       console.log("Voice sample uploaded successfully");
     },
-    onError: (error) => {
+    onError: error => {
       console.warn("Voice upload failed:", error.message);
     },
   });
+
+  useEffect(() => {
+    if (publicThemes.length === 0) return;
+    const resolvedThemeId = publicThemes.some(theme => theme.id === storyTheme)
+      ? storyTheme
+      : defaultThemeId(publicThemes);
+    const resolvedTheme = publicThemes.find(
+      theme => theme.id === resolvedThemeId
+    );
+    if (!catalogInitializedRef.current || resolvedThemeId !== storyTheme) {
+      setStoryTheme(resolvedThemeId);
+      setMusicId(defaultMusicForTheme(resolvedTheme, music));
+      catalogInitializedRef.current = true;
+    }
+  }, [music, publicThemes, storyTheme]);
+
+  useEffect(() => {
+    if (
+      musicId === "none" ||
+      music.some(preset => preset.id === musicId && preset.available)
+    )
+      return;
+    setMusicId(defaultMusicForTheme(selectedTheme, music));
+  }, [music, musicId, selectedTheme]);
 
   const uploadVoiceSample = async (orderId: number, guestToken?: string) => {
     if (!voiceBlob) return;
@@ -143,7 +244,7 @@ export default function UploadPage() {
 
     setSelectedFile(file);
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = e => {
       setPreviewUrl(e.target?.result as string);
     };
     reader.readAsDataURL(file);
@@ -184,7 +285,7 @@ export default function UploadPage() {
       chunksRef.current = [];
       mediaRecorderRef.current = mediaRecorder;
 
-      mediaRecorder.ondataavailable = (e) => {
+      mediaRecorder.ondataavailable = e => {
         if (e.data.size > 0) {
           chunksRef.current.push(e.data);
         }
@@ -194,7 +295,7 @@ export default function UploadPage() {
         const blob = new Blob(chunksRef.current, { type: "audio/webm" });
         setVoiceBlob(blob);
         setVoiceUrl(URL.createObjectURL(blob));
-        stream.getTracks().forEach((track) => track.stop());
+        stream.getTracks().forEach(track => track.stop());
       };
 
       mediaRecorder.start();
@@ -202,10 +303,12 @@ export default function UploadPage() {
       setRecordingDuration(0);
 
       timerRef.current = setInterval(() => {
-        setRecordingDuration((d) => d + 1);
+        setRecordingDuration(d => d + 1);
       }, 1000);
     } catch (err) {
-      toast.error("Could not access microphone. Please check your permissions.");
+      toast.error(
+        "Could not access microphone. Please check your permissions."
+      );
       console.error("Microphone error:", err);
     }
   };
@@ -236,9 +339,43 @@ export default function UploadPage() {
     return `${m}:${s.toString().padStart(2, "0")}`;
   };
 
+  const chooseTheme = (theme: PublicTheme) => {
+    setStoryTheme(theme.id);
+    setMusicId(defaultMusicForTheme(theme, music));
+  };
+
   const handleSubmit = async () => {
     if (!selectedFile || !childName.trim()) {
       toast.error("Please provide a photo and your child's name");
+      return;
+    }
+
+    // Do not send a stale selection if an administrator hid it while this form was open.
+    const refreshed = await publicCatalogQuery.refetch();
+    const freshCatalog = refreshed.data as
+      | { themes: PublicTheme[]; music: MusicPreset[] }
+      | undefined;
+    const freshTheme = freshCatalog?.themes.find(
+      theme => theme.id === storyTheme
+    );
+    const selectedMusic =
+      musicId === "none"
+        ? null
+        : freshCatalog?.music.find(
+            preset => preset.id === musicId && preset.available
+          );
+    if (!freshTheme) {
+      toast.error(
+        "That story theme is no longer available. Please choose a published theme."
+      );
+      setCurrentStep(1);
+      return;
+    }
+    if (musicId !== "none" && !selectedMusic) {
+      toast.error(
+        "That music choice is no longer available. Please choose another soundtrack."
+      );
+      setCurrentStep(1);
       return;
     }
 
@@ -262,6 +399,7 @@ export default function UploadPage() {
         childName: childName.trim(),
         childDescription: childDescription.trim() || undefined,
         storyTheme,
+        musicId,
         mimeType: "image/jpeg",
       });
     } catch (error) {
@@ -276,7 +414,14 @@ export default function UploadPage() {
     setPreviewUrl(null);
     setChildName("");
     setChildDescription("");
-    setStoryTheme("adventure");
+    const nextThemeId = defaultThemeId(publicThemes);
+    setStoryTheme(nextThemeId || "adventure");
+    setMusicId(
+      defaultMusicForTheme(
+        publicThemes.find(theme => theme.id === nextThemeId),
+        music
+      )
+    );
     setCurrentStep(0);
     setIsUploading(false);
     setCompressionInfo(null);
@@ -309,11 +454,17 @@ export default function UploadPage() {
           <div className="container flex items-center justify-between py-2.5 gap-3">
             <p className="text-sm text-blue-700">
               <UserPlus className="w-4 h-4 inline mr-1.5 -mt-0.5" />
-              <span className="font-medium">Create an account</span> to save your orders and access them later from any device.
+              <span className="font-medium">Create an account</span> to save
+              your orders and access them later from any device.
             </p>
-                          <Button variant="outline" size="sm" className="border-blue-300 text-blue-700 hover:bg-blue-100 whitespace-nowrap" onClick={() => openSignIn()}>
-                Sign In / Sign Up
-              </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-blue-300 text-blue-700 hover:bg-blue-100 whitespace-nowrap"
+              onClick={() => openSignIn()}
+            >
+              Sign In / Sign Up
+            </Button>
           </div>
         </div>
       )}
@@ -353,7 +504,7 @@ export default function UploadPage() {
                   type="file"
                   accept="image/*"
                   className="hidden"
-                  onChange={(e) => {
+                  onChange={e => {
                     const file = e.target.files?.[0];
                     if (file) handleFileSelect(file);
                   }}
@@ -418,13 +569,16 @@ export default function UploadPage() {
 
               <div className="space-y-5">
                 <div>
-                  <Label htmlFor="childName" className="text-base font-semibold">
+                  <Label
+                    htmlFor="childName"
+                    className="text-base font-semibold"
+                  >
                     Child's Name <span className="text-red-500">*</span>
                   </Label>
                   <Input
                     id="childName"
                     value={childName}
-                    onChange={(e) => setChildName(e.target.value)}
+                    onChange={e => setChildName(e.target.value)}
                     placeholder="Enter your child's name"
                     className="mt-2"
                     maxLength={100}
@@ -442,68 +596,163 @@ export default function UploadPage() {
                   <p className="text-xs text-slate-500 mt-1 mb-3">
                     Choose the adventure style for your child's story
                   </p>
-                  <div className="grid grid-cols-2 gap-3">
-                    {THEME_OPTIONS.map((theme) => {
-                      const Icon = theme.icon;
-                      const isSelected = storyTheme === theme.id;
-                      return (
-                        <button
-                          key={theme.id}
-                          type="button"
-                          onClick={() => setStoryTheme(theme.id)}
-                          className={`relative flex items-start gap-3 p-3 rounded-xl border-2 text-left transition-all ${
-                            isSelected
-                              ? theme.activeColor
-                              : `${theme.bgColor} hover:shadow-md`
-                          }`}
-                        >
-                          <div
-                            className={`flex-shrink-0 w-10 h-10 rounded-lg bg-gradient-to-br ${theme.color} flex items-center justify-center`}
+                  {publicCatalogQuery.isLoading && (
+                    <div className="rounded-xl border border-purple-200 bg-purple-50 p-4 text-sm text-purple-800 flex items-center gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Loading published story themes…
+                    </div>
+                  )}
+                  {publicCatalogQuery.error && (
+                    <div
+                      role="alert"
+                      className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900"
+                    >
+                      <div className="flex gap-2">
+                        <AlertCircle className="w-5 h-5 shrink-0" />
+                        <div>
+                          <p className="font-semibold">
+                            Story themes could not load
+                          </p>
+                          <p className="mt-1">
+                            Please retry before creating your character.
+                          </p>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="mt-3 border-amber-300"
+                            onClick={() => void publicCatalogQuery.refetch()}
                           >
-                            <Icon className="w-5 h-5 text-white" />
-                          </div>
-                          <div className="min-w-0">
-                            <p className="font-semibold text-sm text-slate-800">
-                              {theme.label}
-                            </p>
-                            <p className="text-xs text-slate-500 leading-tight">
-                              {theme.description}
-                            </p>
-                          </div>
-                          {isSelected && (
-                            <CheckCircle2 className="absolute top-2 right-2 w-5 h-5 text-green-600" />
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
+                            Retry themes
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  {!publicCatalogQuery.isLoading &&
+                    !publicCatalogQuery.error &&
+                    publicThemes.length === 0 && (
+                      <div
+                        role="alert"
+                        className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900"
+                      >
+                        There are no published story themes right now. Please
+                        try again soon.
+                      </div>
+                    )}
+                  {publicCatalog && publicThemes.length > 0 && (
+                    <div className="grid grid-cols-2 gap-3">
+                      {publicThemes.map(theme => {
+                        const Icon =
+                          THEME_ICONS[theme.icon as keyof typeof THEME_ICONS] ??
+                          Sparkles;
+                        const colors =
+                          THEME_COLORS[theme.color] ?? THEME_COLORS.amber;
+                        const isSelected = storyTheme === theme.id;
+                        return (
+                          <button
+                            key={theme.id}
+                            type="button"
+                            onClick={() => chooseTheme(theme)}
+                            className={`relative flex items-start gap-3 p-3 rounded-xl border-2 text-left transition-all ${
+                              isSelected
+                                ? colors.activeColor
+                                : `${colors.bgColor} hover:shadow-md`
+                            }`}
+                          >
+                            <div
+                              className={`flex-shrink-0 w-10 h-10 rounded-lg bg-gradient-to-br ${colors.color} flex items-center justify-center`}
+                            >
+                              <Icon className="w-5 h-5 text-white" />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="font-semibold text-sm text-slate-800">
+                                {theme.title}
+                              </p>
+                              <p className="text-xs text-slate-500 leading-tight">
+                                {theme.description}
+                              </p>
+                            </div>
+                            {isSelected && (
+                              <CheckCircle2 className="absolute top-2 right-2 w-5 h-5 text-green-600" />
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
 
+                {publicCatalog && publicThemes.length > 0 && (
+                  <ThemeMusicPicker
+                    music={music}
+                    selectedMusicId={musicId}
+                    onChange={setMusicId}
+                  />
+                )}
+
+                {selectedTheme && (
+                  <div className="rounded-xl bg-slate-50 border border-slate-200 p-4">
+                    <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                      Your story settings
+                    </p>
+                    <p className="mt-1 text-sm font-semibold text-slate-800">
+                      {selectedTheme.title}
+                      <span className="font-normal text-slate-500">
+                        {" "}
+                        with{" "}
+                        {musicId === "none"
+                          ? "No music"
+                          : (music.find(preset => preset.id === musicId)
+                              ?.label ?? "No music")}
+                      </span>
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      You can review these again before your story is created.
+                    </p>
+                  </div>
+                )}
+
                 <div>
-                  <Label htmlFor="childDescription" className="text-base font-semibold">
+                  <Label
+                    htmlFor="childDescription"
+                    className="text-base font-semibold"
+                  >
                     Brief Description{" "}
-                    <span className="text-slate-400 font-normal text-sm">(optional)</span>
+                    <span className="text-slate-400 font-normal text-sm">
+                      (optional)
+                    </span>
                   </Label>
                   <Textarea
                     id="childDescription"
                     value={childDescription}
-                    onChange={(e) => setChildDescription(e.target.value)}
+                    onChange={e => setChildDescription(e.target.value)}
                     placeholder="e.g., 4 years old, brown curly hair, brown eyes, tall for her age, loves wearing pink dresses"
                     className="mt-2 min-h-[100px]"
                     maxLength={500}
                   />
                   <p className="text-xs text-slate-500 mt-1">
-                    Describe your child's appearance (hair color, eye color, height, build, favorite outfit) to make the character more accurate. {childDescription.length}/500
+                    Describe your child's appearance (hair color, eye color,
+                    height, build, favorite outfit) to make the character more
+                    accurate. {childDescription.length}/500
                   </p>
                 </div>
 
                 <div className="flex gap-3 pt-2">
-                  <Button variant="outline" onClick={resetForm} className="flex-1">
+                  <Button
+                    variant="outline"
+                    onClick={resetForm}
+                    className="flex-1"
+                  >
                     Change Photo
                   </Button>
                   <Button
                     onClick={() => setCurrentStep(2)}
-                    disabled={!childName.trim()}
+                    disabled={
+                      !childName.trim() ||
+                      !selectedTheme ||
+                      publicCatalogQuery.isLoading ||
+                      Boolean(publicCatalogQuery.error)
+                    }
                     className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
                   >
                     Next: Voice Sample
@@ -521,14 +770,36 @@ export default function UploadPage() {
               <CardTitle className="flex items-center gap-2">
                 <Mic className="w-5 h-5 text-purple-600" />
                 Voice Sample
-                <span className="text-sm font-normal text-slate-400">(Optional)</span>
+                <span className="text-sm font-normal text-slate-400">
+                  (Optional)
+                </span>
               </CardTitle>
             </CardHeader>
             <CardContent>
+              {selectedTheme && (
+                <div className="mb-5 rounded-xl border border-purple-100 bg-purple-50 p-4">
+                  <p className="text-xs font-bold uppercase tracking-wide text-purple-700">
+                    Story settings
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-slate-800">
+                    {selectedTheme.title}
+                    <span className="font-normal text-slate-600">
+                      {" "}
+                      ·{" "}
+                      {musicId === "none"
+                        ? "No music"
+                        : (music.find(preset => preset.id === musicId)?.label ??
+                          "No music")}
+                    </span>
+                  </p>
+                </div>
+              )}
               <p className="text-slate-600 mb-6">
-                Record a short voice sample (10-30 seconds) and we'll clone your voice using AI to narrate the storybook! 
-                Your unique voice will be used to tell your child's personalized story. If you skip this step, 
-                we'll use a warm, child-friendly voice for the narration.
+                Record a short voice sample (10-30 seconds) and we'll clone your
+                voice using AI to narrate the storybook! Your unique voice will
+                be used to tell your child's personalized story. If you skip
+                this step, we'll use a warm, child-friendly voice for the
+                narration.
               </p>
 
               {/* Recording UI */}
@@ -604,10 +875,19 @@ export default function UploadPage() {
                   Recording Tips:
                 </h4>
                 <ul className="text-sm text-amber-700 space-y-1">
-                  <li>- Find a quiet environment with minimal background noise</li>
-                  <li>- Speak naturally and cheerfully, as if reading to your child</li>
+                  <li>
+                    - Find a quiet environment with minimal background noise
+                  </li>
+                  <li>
+                    - Speak naturally and cheerfully, as if reading to your
+                    child
+                  </li>
                   <li>- A 10-30 second sample works best</li>
-                  <li>- Try reading: "Once upon a time, in a magical land far away, there lived a brave little adventurer who loved to explore."</li>
+                  <li>
+                    - Try reading: "Once upon a time, in a magical land far
+                    away, there lived a brave little adventurer who loved to
+                    explore."
+                  </li>
                 </ul>
               </div>
 
@@ -621,7 +901,12 @@ export default function UploadPage() {
                 </Button>
                 <Button
                   onClick={handleSubmit}
-                  disabled={isUploading}
+                  disabled={
+                    isUploading ||
+                    !selectedTheme ||
+                    publicCatalogQuery.isLoading ||
+                    Boolean(publicCatalogQuery.error)
+                  }
                   className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
                 >
                   {isUploading ? (

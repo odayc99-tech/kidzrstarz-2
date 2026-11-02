@@ -11,6 +11,7 @@ vi.mock("../jobs/imageGenerationJob", () => ({ scheduleImageGeneration: m.image 
 vi.mock("../services/ttsService", () => ({ getAvailableVoices: () => [] }));
 vi.mock("../services/storyGeneration", () => ({ getAvailableThemes: () => [] }));
 vi.mock("stripe", () => ({ default: class { checkout = { sessions: { create: m.stripeCreate, retrieve: m.stripeRetrieve } }; } }));
+vi.mock("../services/experienceCatalog", () => ({ getOrderExperience: async () => null, getPublicExperienceCatalog: vi.fn(), resolveNewOrderExperience: vi.fn(), saveOrderExperience: vi.fn() }));
 import { ordersRouter } from "./orders";
 import { getPaymentScope } from "../services/paymentContext";
 let order: any;

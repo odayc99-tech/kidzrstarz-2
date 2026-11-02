@@ -4,8 +4,12 @@ import { orders, storyScenes } from "../../drizzle/schema";
 import { getDb, getOrderById } from "../db";
 import { storagePut } from "../storage";
 import { getStorageNamespace } from "../services/storageNamespace";
-import { cloneVoiceWithElevenLabs, generateNarration } from "../services/ttsService";
+import {
+  cloneVoiceWithElevenLabs,
+  generateNarration,
+} from "../services/ttsService";
 import { composeStorybookVideo } from "../services/videoComposition";
+import { getOrderExperience } from "../services/musicAssets";
 
 /**
  * The marker is deliberately stored only while this recovery owns the order.
@@ -15,8 +19,10 @@ import { composeStorybookVideo } from "../services/videoComposition";
 const NARRATION_RECOVERY_LEASE_PREFIX = "NarrationRecovery: lease:";
 const NARRATION_RECOVERY_ERROR_PREFIX = "Narration recovery failed:";
 const NARRATION_RECOVERY_STALE_MS = 30 * 60 * 1000;
-const SAFE_RECOVERY_FAILURE = "Narration recovery failed: Your existing storybook is unchanged. Please try again.";
-const SAFE_RECOVERY_STALE = "Narration recovery stalled: Your existing storybook is unchanged. Please try again.";
+const SAFE_RECOVERY_FAILURE =
+  "Narration recovery failed: Your existing storybook is unchanged. Please try again.";
+const SAFE_RECOVERY_STALE =
+  "Narration recovery stalled: Your existing storybook is unchanged. Please try again.";
 let leaseHeartbeat = 0;
 
 type RecoveryOrder = NonNullable<Awaited<ReturnType<typeof getOrderById>>>;
@@ -73,17 +79,21 @@ function affectedRows(result: unknown): number {
   // drizzle/mysql2 writes may be [ResultSetHeader, FieldPacket[]]. Treat an
   // absent affectedRows as failure; assuming success would defeat the CAS.
   const header = Array.isArray(result) ? result[0] : result;
-  return Number((header as { affectedRows?: unknown } | undefined)?.affectedRows || 0);
+  return Number(
+    (header as { affectedRows?: unknown } | undefined)?.affectedRows || 0
+  );
 }
 
-function isEligibleForNarrationRecovery(order: RecoveryOrder | null): order is RecoveryOrder {
+function isEligibleForNarrationRecovery(
+  order: RecoveryOrder | null
+): order is RecoveryOrder {
   return Boolean(
     order &&
-    order.status === "completed" &&
-    order.paymentStatus === "paid" &&
-    order.storyApproved &&
-    order.videoKey &&
-    (order.voiceSampleKey || order.voiceSampleUrl)
+      order.status === "completed" &&
+      order.paymentStatus === "paid" &&
+      order.storyApproved &&
+      order.videoKey &&
+      (order.voiceSampleKey || order.voiceSampleUrl)
   );
 }
 
@@ -107,7 +117,8 @@ function sceneSnapshotCondition(scene: SceneRow) {
 }
 
 function sameSceneSnapshot(current: SceneRow, snapshot: SceneRow): boolean {
-  return current.id === snapshot.id &&
+  return (
+    current.id === snapshot.id &&
     current.orderId === snapshot.orderId &&
     current.sceneIndex === snapshot.sceneIndex &&
     current.sceneText === snapshot.sceneText &&
@@ -116,7 +127,8 @@ function sameSceneSnapshot(current: SceneRow, snapshot: SceneRow): boolean {
     current.illustrationUrl === snapshot.illustrationUrl &&
     current.narrationKey === snapshot.narrationKey &&
     current.narrationUrl === snapshot.narrationUrl &&
-    current.status === snapshot.status;
+    current.status === snapshot.status
+  );
 }
 
 /**
@@ -126,7 +138,9 @@ function sameSceneSnapshot(current: SceneRow, snapshot: SceneRow): boolean {
  */
 function canonicalScenesFrom(rows: SceneRow[]): SceneRow[] {
   if (rows.length === 0) {
-    throw new Error("No completed canonical scenes are available for narration recovery");
+    throw new Error(
+      "No completed canonical scenes are available for narration recovery"
+    );
   }
 
   const byIndex = new Map<number, SceneRow[]>();
@@ -139,11 +153,15 @@ function canonicalScenesFrom(rows: SceneRow[]): SceneRow[] {
   const canonical: SceneRow[] = [];
   for (const group of Array.from(byIndex.values())) {
     const selected = [...group]
-      .filter((scene) => scene.status === "completed" && Boolean(scene.illustrationKey))
+      .filter(
+        scene => scene.status === "completed" && Boolean(scene.illustrationKey)
+      )
       .sort((a, b) => b.id - a.id)[0];
 
     if (!selected) {
-      throw new Error("All existing scenes must have completed canonical illustrations");
+      throw new Error(
+        "All existing scenes must have completed canonical illustrations"
+      );
     }
     if (!selected.sceneText.trim()) {
       throw new Error("A completed scene is missing narration text");
@@ -154,7 +172,11 @@ function canonicalScenesFrom(rows: SceneRow[]): SceneRow[] {
   return canonical.sort((a, b) => a.sceneIndex - b.sceneIndex);
 }
 
-function recoveryLeaseCondition(orderId: number, originalVideoKey: string, marker: string) {
+function recoveryLeaseCondition(
+  orderId: number,
+  originalVideoKey: string,
+  marker: string
+) {
   return and(
     eq(orders.id, orderId),
     eq(orders.status, "completed"),
@@ -165,7 +187,10 @@ function recoveryLeaseCondition(orderId: number, originalVideoKey: string, marke
   );
 }
 
-async function claimNarrationRecovery(db: any, order: RecoveryOrder): Promise<Lease | null> {
+async function claimNarrationRecovery(
+  db: any,
+  order: RecoveryOrder
+): Promise<Lease | null> {
   if (!isEligibleForNarrationRecovery(order)) return null;
 
   const originalVideoKey = order.videoKey;
@@ -177,56 +202,82 @@ async function claimNarrationRecovery(db: any, order: RecoveryOrder): Promise<Le
   const result = await db
     .update(orders)
     .set({ errorMessage: marker })
-    .where(and(
-      eq(orders.id, order.id),
-      eq(orders.status, "completed"),
-      eq(orders.paymentStatus, "paid"),
-      eq(orders.storyApproved, true),
-      eq(orders.videoKey, originalVideoKey),
-      // Existing non-recovery errors, including the original quota error, are
-      // eligible for an explicit recovery. Only a fresh recovery lease blocks it.
-      or(
-        isNull(orders.errorMessage),
-        notLike(orders.errorMessage, `${NARRATION_RECOVERY_LEASE_PREFIX}%`),
-        and(
-          like(orders.errorMessage, `${NARRATION_RECOVERY_LEASE_PREFIX}%`),
-          lt(orders.updatedAt, staleBefore)
+    .where(
+      and(
+        eq(orders.id, order.id),
+        eq(orders.status, "completed"),
+        eq(orders.paymentStatus, "paid"),
+        eq(orders.storyApproved, true),
+        eq(orders.videoKey, originalVideoKey),
+        // Existing non-recovery errors, including the original quota error, are
+        // eligible for an explicit recovery. Only a fresh recovery lease blocks it.
+        or(
+          isNull(orders.errorMessage),
+          notLike(orders.errorMessage, `${NARRATION_RECOVERY_LEASE_PREFIX}%`),
+          and(
+            like(orders.errorMessage, `${NARRATION_RECOVERY_LEASE_PREFIX}%`),
+            lt(orders.updatedAt, staleBefore)
+          )
         )
       )
-    ));
+    );
 
   if (affectedRows(result) !== 1) return null;
   return { token, marker, originalVideoKey };
 }
 
-async function renewNarrationRecoveryLease(db: any, orderId: number, lease: Lease): Promise<Lease | null> {
+async function renewNarrationRecoveryLease(
+  db: any,
+  orderId: number,
+  lease: Lease
+): Promise<Lease | null> {
   const marker = leaseMarker(lease.token);
   const result = await db
     .update(orders)
     .set({ errorMessage: marker })
-    .where(recoveryLeaseCondition(orderId, lease.originalVideoKey, lease.marker));
+    .where(
+      recoveryLeaseCondition(orderId, lease.originalVideoKey, lease.marker)
+    );
 
   return affectedRows(result) === 1 ? { ...lease, marker } : null;
 }
 
-async function cacheClonedVoice(db: any, orderId: number, lease: Lease, voiceId: string): Promise<boolean> {
+async function cacheClonedVoice(
+  db: any,
+  orderId: number,
+  lease: Lease,
+  voiceId: string
+): Promise<boolean> {
   const result = await db
     .update(orders)
     .set({ elevenlabsVoiceId: voiceId })
-    .where(and(recoveryLeaseCondition(orderId, lease.originalVideoKey, lease.marker), isNull(orders.elevenlabsVoiceId)));
+    .where(
+      and(
+        recoveryLeaseCondition(orderId, lease.originalVideoKey, lease.marker),
+        isNull(orders.elevenlabsVoiceId)
+      )
+    );
   return affectedRows(result) === 1;
 }
 
-async function failNarrationRecovery(db: any, orderId: number, lease: Lease): Promise<void> {
+async function failNarrationRecovery(
+  db: any,
+  orderId: number,
+  lease: Lease
+): Promise<void> {
   try {
     // Never clear or alter a lease owned by another instance. The completed
     // status, video, payment and all prior scene assets remain intact on error.
     await db
       .update(orders)
       .set({ errorMessage: SAFE_RECOVERY_FAILURE })
-      .where(recoveryLeaseCondition(orderId, lease.originalVideoKey, lease.marker));
+      .where(
+        recoveryLeaseCondition(orderId, lease.originalVideoKey, lease.marker)
+      );
   } catch (error) {
-    console.warn(`[NarrationRecovery] Could not record safe failure for order ${orderId}`);
+    console.warn(
+      `[NarrationRecovery] Could not record safe failure for order ${orderId}`
+    );
   }
 }
 
@@ -246,26 +297,37 @@ async function commitNarrationRecovery(
     const ownedOrders = await tx
       .select()
       .from(orders)
-      .where(recoveryLeaseCondition(orderId, lease.originalVideoKey, lease.marker));
+      .where(
+        recoveryLeaseCondition(orderId, lease.originalVideoKey, lease.marker)
+      );
     if (!ownedOrders[0]) throw new LeaseLostError();
 
-    const currentScenes = await tx
+    const currentScenes = (await tx
       .select()
       .from(storyScenes)
-      .where(eq(storyScenes.orderId, orderId)) as SceneRow[];
-    const currentById = new Map(currentScenes.map((scene) => [scene.id, scene]));
+      .where(eq(storyScenes.orderId, orderId))) as SceneRow[];
+    const currentById = new Map(currentScenes.map(scene => [scene.id, scene]));
     if (
-      snapshots.some((snapshot) => !currentById.has(snapshot.id) || !sameSceneSnapshot(currentById.get(snapshot.id)!, snapshot))
+      snapshots.some(
+        snapshot =>
+          !currentById.has(snapshot.id) ||
+          !sameSceneSnapshot(currentById.get(snapshot.id)!, snapshot)
+      )
     ) {
       throw new SceneSnapshotChangedError();
     }
 
     for (const replacement of replacements) {
-      const snapshot = snapshots.find((scene) => scene.id === replacement.sceneId);
+      const snapshot = snapshots.find(
+        scene => scene.id === replacement.sceneId
+      );
       if (!snapshot) throw new SceneSnapshotChangedError();
       const result = await tx
         .update(storyScenes)
-        .set({ narrationKey: replacement.narrationKey, narrationUrl: replacement.narrationUrl })
+        .set({
+          narrationKey: replacement.narrationKey,
+          narrationUrl: replacement.narrationUrl,
+        })
         .where(sceneSnapshotCondition(snapshot));
       if (affectedRows(result) !== 1) throw new SceneSnapshotChangedError();
     }
@@ -277,7 +339,9 @@ async function commitNarrationRecovery(
         videoUrl: uploadedVideo.url,
         errorMessage: null,
       })
-      .where(recoveryLeaseCondition(orderId, lease.originalVideoKey, lease.marker));
+      .where(
+        recoveryLeaseCondition(orderId, lease.originalVideoKey, lease.marker)
+      );
     if (affectedRows(orderResult) !== 1) throw new LeaseLostError();
   });
 }
@@ -301,7 +365,9 @@ export function scheduleNarrationRecovery(orderId: number): boolean {
     processNarrationRecovery(orderId)
       .catch(() => {
         // processNarrationRecovery handles failures after obtaining a lease.
-        console.warn(`[NarrationRecovery] Unexpected queue failure for order ${orderId}`);
+        console.warn(
+          `[NarrationRecovery] Unexpected queue failure for order ${orderId}`
+        );
       })
       .finally(() => activeNarrationRecoveries.delete(orderId));
   }, 0);
@@ -313,7 +379,10 @@ export function scheduleNarrationRecovery(orderId: number): boolean {
  * Convert the internal lease/error convention into safe client state. This
  * intentionally never returns a lease token or raw provider error.
  */
-export function getNarrationRecoveryState(order: { errorMessage?: string | null; updatedAt?: Date | string | null }): { pending: boolean; error: string | null } {
+export function getNarrationRecoveryState(order: {
+  errorMessage?: string | null;
+  updatedAt?: Date | string | null;
+}): { pending: boolean; error: string | null } {
   const errorMessage = order.errorMessage || null;
   if (isLeaseMarker(errorMessage)) {
     const updatedAt = order.updatedAt ? new Date(order.updatedAt).getTime() : 0;
@@ -345,10 +414,18 @@ export async function processNarrationRecovery(orderId: number): Promise<void> {
   if (!lease) return;
 
   try {
-    const allScenes = await db
+    // Resolve the immutable experience before cloning or generating any
+    // narration. A failure remains inside the existing lease/rollback path so
+    // no old scene or video reference is changed and no provider work begins.
+    const orderExperience = await getOrderExperience(
+      order.originalImageKey,
+      order.storyTheme
+    );
+
+    const allScenes = (await db
       .select()
       .from(storyScenes)
-      .where(eq(storyScenes.orderId, orderId)) as SceneRow[];
+      .where(eq(storyScenes.orderId, orderId))) as SceneRow[];
     const snapshots = canonicalScenesFrom(allScenes);
 
     let voiceId = order.elevenlabsVoiceId || null;
@@ -363,9 +440,11 @@ export async function processNarrationRecovery(orderId: number): Promise<void> {
         order.voiceSampleKey || undefined
       );
       if (!clonedVoiceId) {
-        throw new Error("A custom voice could not be prepared for narration recovery");
+        throw new Error(
+          "A custom voice could not be prepared for narration recovery"
+        );
       }
-      if (!await cacheClonedVoice(db, orderId, lease, clonedVoiceId)) {
+      if (!(await cacheClonedVoice(db, orderId, lease, clonedVoiceId))) {
         throw new LeaseLostError();
       }
       voiceId = clonedVoiceId;
@@ -377,12 +456,19 @@ export async function processNarrationRecovery(orderId: number): Promise<void> {
       if (!renewed) throw new LeaseLostError();
       lease = renewed;
 
-      const audio = await generateNarration(scene.sceneText, order.userId, orderId, {
-        elevenlabsVoiceId: voiceId,
-        requireCustomVoice: true,
-      });
+      const audio = await generateNarration(
+        scene.sceneText,
+        order.userId,
+        orderId,
+        {
+          elevenlabsVoiceId: voiceId,
+          requireCustomVoice: true,
+        }
+      );
       if (!audio.audioKey || !audio.audioUrl) {
-        throw new Error("Custom voice narration returned incomplete audio metadata");
+        throw new Error(
+          "Custom voice narration returned incomplete audio metadata"
+        );
       }
       replacements.push({
         sceneId: scene.id,
@@ -391,38 +477,61 @@ export async function processNarrationRecovery(orderId: number): Promise<void> {
       });
     }
 
-    const replacementBySceneId = new Map(replacements.map((replacement) => [replacement.sceneId, replacement]));
+    const replacementBySceneId = new Map(
+      replacements.map(replacement => [replacement.sceneId, replacement])
+    );
     const renewed = await renewNarrationRecoveryLease(db, orderId, lease);
     if (!renewed) throw new LeaseLostError();
     lease = renewed;
 
-    const videoBuffer = await composeStorybookVideo(
-      snapshots.map((scene) => {
-        const replacement = replacementBySceneId.get(scene.id);
-        if (!replacement) throw new Error("Narration replacement is missing for a canonical scene");
-        return {
-          sceneIndex: scene.sceneIndex,
-          illustrationKey: scene.illustrationKey,
-          illustrationUrl: scene.illustrationUrl,
-          narrationKey: replacement.narrationKey,
-          narrationUrl: replacement.narrationUrl,
-        };
-      }),
-      order.storyTheme
-    );
+    const replacementScenes = snapshots.map(scene => {
+      const replacement = replacementBySceneId.get(scene.id);
+      if (!replacement)
+        throw new Error(
+          "Narration replacement is missing for a canonical scene"
+        );
+      return {
+        sceneIndex: scene.sceneIndex,
+        illustrationKey: scene.illustrationKey,
+        illustrationUrl: scene.illustrationUrl,
+        narrationKey: replacement.narrationKey,
+        narrationUrl: replacement.narrationUrl,
+      };
+    });
+    const videoBuffer = orderExperience
+      ? await composeStorybookVideo(
+          replacementScenes,
+          orderExperience.theme.id,
+          orderExperience.music
+        )
+      : await composeStorybookVideo(replacementScenes, order.storyTheme);
     if (!videoBuffer || videoBuffer.length === 0) {
       throw new Error("Narration recovery composition returned an empty MP4");
     }
 
-    const afterComposition = await renewNarrationRecoveryLease(db, orderId, lease);
+    const afterComposition = await renewNarrationRecoveryLease(
+      db,
+      orderId,
+      lease
+    );
     if (!afterComposition) throw new LeaseLostError();
     lease = afterComposition;
 
     const namespace = getStorageNamespace(order.userId, orderId);
     const requestedVideoKey = `${namespace}/videos/${nanoid()}-storybook-h264420.mp4`;
-    const uploadedVideo = await storagePut(requestedVideoKey, videoBuffer, "video/mp4");
-    if (!uploadedVideo.key || !uploadedVideo.key.endsWith("-storybook-h264420.mp4") || !uploadedVideo.url) {
-      throw new Error("Narration recovery video upload did not return a canonical MP4 key");
+    const uploadedVideo = await storagePut(
+      requestedVideoKey,
+      videoBuffer,
+      "video/mp4"
+    );
+    if (
+      !uploadedVideo.key ||
+      !uploadedVideo.key.endsWith("-storybook-h264420.mp4") ||
+      !uploadedVideo.url
+    ) {
+      throw new Error(
+        "Narration recovery video upload did not return a canonical MP4 key"
+      );
     }
 
     const afterUpload = await renewNarrationRecoveryLease(db, orderId, lease);
@@ -431,16 +540,27 @@ export async function processNarrationRecovery(orderId: number): Promise<void> {
 
     // The transaction verifies both the most recent lease marker and the full
     // pre-generation scene snapshot before changing any customer references.
-    await commitNarrationRecovery(db, orderId, lease, snapshots, replacements, uploadedVideo);
+    await commitNarrationRecovery(
+      db,
+      orderId,
+      lease,
+      snapshots,
+      replacements,
+      uploadedVideo
+    );
   } catch (error) {
     if (error instanceof LeaseLostError) {
-      console.warn(`[NarrationRecovery] Lease lost for order ${orderId}; leaving current assets untouched`);
+      console.warn(
+        `[NarrationRecovery] Lease lost for order ${orderId}; leaving current assets untouched`
+      );
       return;
     }
 
     // A transaction exception rolls back scene/video reference swaps first.
     // This safe error is written only while this exact worker still owns lease.
     await failNarrationRecovery(db, orderId, lease);
-    console.warn(`[NarrationRecovery] Recovery failed for order ${orderId}; existing media was preserved`);
+    console.warn(
+      `[NarrationRecovery] Recovery failed for order ${orderId}; existing media was preserved`
+    );
   }
 }

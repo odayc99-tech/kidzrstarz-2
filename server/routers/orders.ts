@@ -29,6 +29,8 @@ import { scheduleNarrationRecovery, isNarrationRecovering, getNarrationRecoveryS
 import { getAvailableVoices } from "../services/ttsService";
 import { getAvailableThemes } from "../services/storyGeneration";
 import { getStorageNamespace } from "../services/storageNamespace";
+import { getPublicExperienceCatalog, resolveNewOrderExperience, saveOrderExperience, getOrderExperience } from "../services/experienceCatalog";
+import type { MusicSelection } from "../../shared/experienceCatalog";
 import Stripe from "stripe";
 
 const getStripe = () => {
@@ -68,6 +70,24 @@ async function verifyOrderAccess(
   });
 }
 
+async function orderExperienceDisplay(order: { originalImageKey: string; storyTheme: string }) {
+  const legacyTitle = getAvailableThemes().find(theme => theme.id === order.storyTheme)?.label || order.storyTheme;
+  try {
+    const snapshot = await getOrderExperience(order);
+    return {
+      themeTitle: snapshot?.theme.title || legacyTitle,
+      musicSelection: snapshot ? snapshot.music : undefined as MusicSelection | null | undefined,
+      musicAccessError: null as string | null,
+    };
+  } catch {
+    return {
+      themeTitle: legacyTitle,
+      musicSelection: null as MusicSelection | null | undefined,
+      musicAccessError: "The saved music settings are temporarily unavailable. Please refresh to try again.",
+    };
+  }
+}
+
 function narrationRetryPending(order: NonNullable<Awaited<ReturnType<typeof getOrderById>>>): boolean {
   return isNarrationRecovering(order.id) || getNarrationRecoveryState(order).pending;
 }
@@ -105,8 +125,9 @@ export const ordersRouter = router({
   /**
    * Get available story themes (public - no auth required)
    */
-  getThemes: publicProcedure.query(() => {
-    return getAvailableThemes();
+  getThemes: publicProcedure.query(async () => {
+    const catalog = await getPublicExperienceCatalog();
+    return catalog.themes.map(theme => ({ id: theme.id, label: theme.title, description: theme.description }));
   }),
 
   /**
@@ -173,6 +194,7 @@ export const ordersRouter = router({
         childName: z.string().min(1).max(100),
         childDescription: z.string().max(500).optional(),
         storyTheme: z.string().max(100).default("adventure"),
+        musicId: z.string().max(64).optional(),
         mimeType: z.string().default("image/jpeg"),
       })
     )
@@ -181,6 +203,8 @@ export const ordersRouter = router({
       const guestToken = userId ? null : nanoid(32);
 
       try {
+        // Resolve published settings before uploads, order insertion or provider jobs.
+        const experience = await resolveNewOrderExperience(input.storyTheme, input.musicId);
         // Decode base64 and upload to S3
         const buffer = Buffer.from(input.imageBase64, "base64");
         const ns = userId ? `${userId}` : `guest-${guestToken}`;
@@ -192,6 +216,8 @@ export const ordersRouter = router({
           input.mimeType
         );
 
+        // Immutable private sidecar: edits/hiding later cannot change this order.
+        await saveOrderExperience(fileKey, experience);
         // Create order record
         const result = await createOrder({
           userId,
@@ -220,6 +246,9 @@ export const ordersRouter = router({
           message: "Order created successfully. Preview is being generated.",
         };
       } catch (error) {
+        if (error instanceof Error && error.name === "ExperienceCatalogValidationError") {
+          throw new TRPCError({ code: "BAD_REQUEST", message: error.message });
+        }
         const msg = error instanceof Error ? error.message.toLowerCase() : "";
         if (msg.includes("rate") || msg.includes("exceeded") || msg.includes("429") || msg.includes("too many")) {
           throw new Error("Our servers are busy right now. Please wait a moment and try again.");
@@ -305,6 +334,7 @@ export const ordersRouter = router({
       const narrationPending = narrationRetryPending(order);
       return {
         ...order,
+        ...await orderExperienceDisplay(order),
         originalImageUrl,
         generatedImageUrl,
         previewImageUrl,
@@ -817,6 +847,7 @@ export const ordersRouter = router({
         childName: order.childName,
         story: order.story,
         storyTheme: order.storyTheme,
+        ...await orderExperienceDisplay(order),
         generatedImageUrl: await privateMediaUrl(order.generatedImageKey, order.generatedImageUrl),
         hasVideo: !!(order.videoKey || order.videoUrl),
         videoKey: order.videoKey || null, // needed for download URL generation

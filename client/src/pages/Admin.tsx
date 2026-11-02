@@ -43,30 +43,32 @@ export default function AdminPage() {
   });
 
   const retryVideo = trpc.orders.adminRetryVideoGeneration.useMutation({
-    onSuccess: (data) => {
+    onSuccess: data => {
       toast.success(data.message);
       utils.orders.adminGetAllOrders.invalidate();
     },
-    onError: (err) => {
+    onError: err => {
       toast.error(err.message);
     },
   });
 
   const backfillCompleted = trpc.orders.backfillCompletedOrders.useMutation({
-    onSuccess: (data) => {
+    onSuccess: data => {
       toast.success(data.message);
       utils.orders.adminGetAllOrders.invalidate();
     },
-    onError: (err) => {
+    onError: err => {
       toast.error(err.message);
     },
   });
   const batchGenerate = trpc.orders.batchGenerateVideos.useMutation({
-    onSuccess: (data) => {
-      toast.success(`Batch triggered: ${data.triggered} of ${data.totalFound} orders`);
+    onSuccess: data => {
+      toast.success(
+        `Batch triggered: ${data.triggered} of ${data.totalFound} orders`
+      );
       utils.orders.adminGetAllOrders.invalidate();
     },
-    onError: (err) => {
+    onError: err => {
       toast.error(err.message);
     },
   });
@@ -76,39 +78,50 @@ export default function AdminPage() {
     if (!allOrders) return [];
     switch (filter) {
       case "paid":
-        return allOrders.filter((o) => o.paymentStatus === "paid");
+        return allOrders.filter(o => o.paymentStatus === "paid");
       case "video_failed":
         return allOrders.filter(
-          (o) =>
+          o =>
             o.paymentStatus === "paid" &&
             o.errorMessage &&
             o.errorMessage.includes("Video generation failed")
         );
       case "no_video":
         return allOrders.filter(
-          (o) =>
+          o =>
             o.paymentStatus === "paid" &&
             o.storyApproved &&
             !o.videoUrl &&
-            !(o.errorMessage && o.errorMessage.includes("Video generation failed"))
+            !(
+              o.errorMessage &&
+              o.errorMessage.includes("Video generation failed")
+            )
         );
       case "has_video":
-        return allOrders.filter((o) => !!o.videoUrl);
+        return allOrders.filter(o => !!o.videoUrl);
       default:
         return allOrders;
     }
   }, [allOrders, filter]);
 
   const stats = useMemo(() => {
-    if (!allOrders) return { total: 0, paid: 0, withVideo: 0, failed: 0, pending: 0, generating: 0 };
-    const paid = allOrders.filter((o) => o.paymentStatus === "paid");
-    const withVideo = allOrders.filter((o) => !!o.videoUrl);
+    if (!allOrders)
+      return {
+        total: 0,
+        paid: 0,
+        withVideo: 0,
+        failed: 0,
+        pending: 0,
+        generating: 0,
+      };
+    const paid = allOrders.filter(o => o.paymentStatus === "paid");
+    const withVideo = allOrders.filter(o => !!o.videoUrl);
     const failed = allOrders.filter(
-      (o) => o.errorMessage && o.errorMessage.includes("Video generation failed")
+      o => o.errorMessage && o.errorMessage.includes("Video generation failed")
     );
-    const generating = allOrders.filter((o) => o.videoGenerating);
+    const generating = allOrders.filter(o => o.videoGenerating);
     const pending = paid.filter(
-      (o) =>
+      o =>
         o.storyApproved &&
         !o.videoUrl &&
         !o.videoGenerating &&
@@ -159,12 +172,33 @@ export default function AdminPage() {
   }
 
   const getVideoStatus = (order: NonNullable<typeof allOrders>[0]) => {
-    if (order.videoUrl) return { label: "Complete", color: "bg-green-100 text-green-800", icon: CheckCircle2 };
-    if (order.videoGenerating) return { label: "Generating", color: "bg-blue-100 text-blue-800", icon: Loader2 };
-    if (order.errorMessage && order.errorMessage.includes("Video generation failed"))
-      return { label: "Failed", color: "bg-red-100 text-red-800", icon: XCircle };
+    if (order.videoUrl)
+      return {
+        label: "Complete",
+        color: "bg-green-100 text-green-800",
+        icon: CheckCircle2,
+      };
+    if (order.videoGenerating)
+      return {
+        label: "Generating",
+        color: "bg-blue-100 text-blue-800",
+        icon: Loader2,
+      };
+    if (
+      order.errorMessage &&
+      order.errorMessage.includes("Video generation failed")
+    )
+      return {
+        label: "Failed",
+        color: "bg-red-100 text-red-800",
+        icon: XCircle,
+      };
     if (order.paymentStatus === "paid" && order.storyApproved)
-      return { label: "Pending", color: "bg-yellow-100 text-yellow-800", icon: Clock };
+      return {
+        label: "Pending",
+        color: "bg-yellow-100 text-yellow-800",
+        icon: Clock,
+      };
     return { label: "N/A", color: "bg-slate-100 text-slate-600", icon: Clock };
   };
 
@@ -186,13 +220,24 @@ export default function AdminPage() {
             </h1>
           </div>
           <div className="flex items-center gap-2">
+            <Link href="/admin/themes">
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-purple-200 text-purple-700 hover:bg-purple-50"
+              >
+                Themes
+              </Button>
+            </Link>
             <Button
               variant="outline"
               size="sm"
               onClick={() => refetchOrders()}
               disabled={ordersLoading}
             >
-              <RefreshCw className={`w-4 h-4 mr-1 ${ordersLoading ? "animate-spin" : ""}`} />
+              <RefreshCw
+                className={`w-4 h-4 mr-1 ${ordersLoading ? "animate-spin" : ""}`}
+              />
               Refresh
             </Button>
             <Button
@@ -283,7 +328,9 @@ export default function AdminPage() {
           <Card>
             <CardContent className="pt-8 text-center">
               <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-              <p className="text-slate-600">Failed to load orders: {ordersError.message}</p>
+              <p className="text-slate-600">
+                Failed to load orders: {ordersError.message}
+              </p>
             </CardContent>
           </Card>
         ) : (
@@ -292,41 +339,69 @@ export default function AdminPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-slate-200 bg-slate-50">
-                    <th className="text-left px-4 py-3 font-semibold text-slate-700">Order</th>
-                    <th className="text-left px-4 py-3 font-semibold text-slate-700">Child</th>
-                    <th className="text-left px-4 py-3 font-semibold text-slate-700">Payment</th>
-                    <th className="text-left px-4 py-3 font-semibold text-slate-700">Story</th>
-                    <th className="text-left px-4 py-3 font-semibold text-slate-700">Image</th>
-                    <th className="text-left px-4 py-3 font-semibold text-slate-700">Video</th>
-                    <th className="text-left px-4 py-3 font-semibold text-slate-700">Actions</th>
+                    <th className="text-left px-4 py-3 font-semibold text-slate-700">
+                      Order
+                    </th>
+                    <th className="text-left px-4 py-3 font-semibold text-slate-700">
+                      Child
+                    </th>
+                    <th className="text-left px-4 py-3 font-semibold text-slate-700">
+                      Payment
+                    </th>
+                    <th className="text-left px-4 py-3 font-semibold text-slate-700">
+                      Story
+                    </th>
+                    <th className="text-left px-4 py-3 font-semibold text-slate-700">
+                      Image
+                    </th>
+                    <th className="text-left px-4 py-3 font-semibold text-slate-700">
+                      Video
+                    </th>
+                    <th className="text-left px-4 py-3 font-semibold text-slate-700">
+                      Actions
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredOrders.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="text-center py-12 text-slate-500">
+                      <td
+                        colSpan={7}
+                        className="text-center py-12 text-slate-500"
+                      >
                         No orders match the current filter.
                       </td>
                     </tr>
                   ) : (
-                    filteredOrders.map((order) => {
+                    filteredOrders.map(order => {
                       const videoStatus = getVideoStatus(order);
                       const VideoIcon = videoStatus.icon;
                       const isExpanded = expandedOrder === order.id;
 
                       return (
-                        <tr key={order.id} className="border-b border-slate-100 hover:bg-slate-50/50">
+                        <tr
+                          key={order.id}
+                          className="border-b border-slate-100 hover:bg-slate-50/50"
+                        >
                           <td className="px-4 py-3">
-                            <div className="font-mono text-xs text-slate-500">#{order.id}</div>
+                            <div className="font-mono text-xs text-slate-500">
+                              #{order.id}
+                            </div>
                             <div className="text-xs text-slate-400">
                               {new Date(order.createdAt).toLocaleDateString()}
                             </div>
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-2">
-                              {(order.generatedImageUrl || order.previewImageUrl || order.originalImageUrl) && (
+                              {(order.generatedImageUrl ||
+                                order.previewImageUrl ||
+                                order.originalImageUrl) && (
                                 <img
-                                  src={order.generatedImageUrl || order.previewImageUrl || order.originalImageUrl}
+                                  src={
+                                    order.generatedImageUrl ||
+                                    order.previewImageUrl ||
+                                    order.originalImageUrl
+                                  }
                                   alt=""
                                   className="w-8 h-8 rounded-full object-cover flex-shrink-0"
                                 />
@@ -374,7 +449,9 @@ export default function AdminPage() {
                             <div className="flex items-center gap-1.5">
                               <VideoIcon
                                 className={`w-4 h-4 ${
-                                  videoStatus.label === "Generating" ? "animate-spin" : ""
+                                  videoStatus.label === "Generating"
+                                    ? "animate-spin"
+                                    : ""
                                 }`}
                               />
                               <span
@@ -395,11 +472,15 @@ export default function AdminPage() {
                                     variant="outline"
                                     className={`h-7 text-xs ${
                                       order.errorMessage &&
-                                      order.errorMessage.includes("Video generation failed")
+                                      order.errorMessage.includes(
+                                        "Video generation failed"
+                                      )
                                         ? "border-red-300 text-red-700 hover:bg-red-50"
                                         : "border-blue-300 text-blue-700 hover:bg-blue-50"
                                     }`}
-                                    onClick={() => retryVideo.mutate({ orderId: order.id })}
+                                    onClick={() =>
+                                      retryVideo.mutate({ orderId: order.id })
+                                    }
                                     disabled={retryVideo.isPending}
                                   >
                                     {retryVideo.isPending ? (
@@ -415,7 +496,11 @@ export default function AdminPage() {
 
                               {/* View storybook */}
                               <Link href={`/storybook?orderId=${order.id}`}>
-                                <Button variant="ghost" size="sm" className="h-7 text-xs">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 text-xs"
+                                >
                                   <Eye className="w-3 h-3 mr-1" />
                                   View
                                 </Button>
@@ -428,7 +513,9 @@ export default function AdminPage() {
                                   size="sm"
                                   className="h-7 w-7 p-0"
                                   onClick={() =>
-                                    setExpandedOrder(isExpanded ? null : order.id)
+                                    setExpandedOrder(
+                                      isExpanded ? null : order.id
+                                    )
                                   }
                                 >
                                   {isExpanded ? (
@@ -482,8 +569,8 @@ function StatCard({
         active
           ? "ring-2 ring-blue-500 bg-blue-50"
           : highlight
-          ? "ring-1 ring-red-300 bg-red-50/50"
-          : "hover:shadow-md"
+            ? "ring-1 ring-red-300 bg-red-50/50"
+            : "hover:shadow-md"
       }`}
       onClick={onClick}
     >

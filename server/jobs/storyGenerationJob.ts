@@ -2,6 +2,7 @@ import { generateStory } from "../services/storyGeneration";
 import { getOrderById, getDb } from "../db";
 import { orders } from "../../drizzle/schema";
 import { eq } from "drizzle-orm";
+import { getOrderExperience } from "../services/experienceCatalog";
 
 export async function processStoryGeneration(orderId: number): Promise<void> {
   try {
@@ -18,10 +19,16 @@ export async function processStoryGeneration(orderId: number): Promise<void> {
       ? `a child who ${order.childDescription}`
       : "a brave and curious child";
 
+    const experience = await getOrderExperience(order);
     const story = await generateStory({
       childName: order.childName || "Your Character",
       characterDescription: characterDesc,
       theme: order.storyTheme || "adventure",
+      themeDefinition: experience ? {
+        label: experience.theme.title,
+        description: experience.theme.storySetting,
+        tone: experience.theme.storyTone,
+      } : undefined,
     });
 
     // Update the order with the generated story

@@ -20,6 +20,7 @@ vi.mock("../jobs/narrationRecoveryJob", () => ({ scheduleNarrationRecovery: vi.f
 vi.mock("../services/ttsService", () => ({ getAvailableVoices: () => [] }));
 vi.mock("../services/storyGeneration", () => ({ getAvailableThemes: () => [] }));
 vi.mock("../services/storageNamespace", () => ({ getStorageNamespace: () => "mock" }));
+vi.mock("../services/experienceCatalog", () => ({ getOrderExperience: async () => null, getPublicExperienceCatalog: vi.fn(), resolveNewOrderExperience: vi.fn(), saveOrderExperience: vi.fn() }));
 
 import { ordersRouter } from "./orders";
 let serial = 100;

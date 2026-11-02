@@ -2,14 +2,12 @@ import { trpc } from "@/lib/trpc";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Link, useParams } from "wouter";
+import { Loader2, AlertCircle, Film, Sparkles, Home } from "lucide-react";
 import {
-  Loader2,
-  AlertCircle,
-  Film,
-  Sparkles,
-  Home,
-} from "lucide-react";
-import { StoryPlayer, Scene } from "@/components/StoryPlayer";
+  StoryPlayer,
+  Scene,
+  type MusicSelection,
+} from "@/components/StoryPlayer";
 
 export default function SharedStorybookPage() {
   const params = useParams<{ token: string }>();
@@ -72,9 +70,15 @@ export default function SharedStorybookPage() {
   }));
 
   const completedScenes = playerScenes.filter(
-    (s) => s.status === "completed" && s.illustrationUrl
+    s => s.status === "completed" && s.illustrationUrl
   );
   const hasCompletedScenes = completedScenes.length > 0;
+  // Undefined identifies old response data; null identifies a saved no-music
+  // order. Preserve both values rather than making a current theme fallback.
+  const musicResponse = storybook as typeof storybook & {
+    musicSelection?: MusicSelection | null;
+    musicAccessError?: string | null;
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
@@ -117,13 +121,17 @@ export default function SharedStorybookPage() {
               scenes={playerScenes}
               childName={storybook.childName || "Child"}
               storyTheme={storybook.storyTheme}
+              musicSelection={musicResponse.musicSelection}
+              musicError={musicResponse.musicAccessError}
               isLoading={false}
             />
           ) : (
             <div className="bg-slate-900 rounded-2xl overflow-hidden aspect-video flex items-center justify-center">
               <div className="text-center text-white px-6">
                 <Film className="w-12 h-12 mx-auto mb-4 text-purple-400" />
-                <p className="text-lg font-medium">Storybook is being created</p>
+                <p className="text-lg font-medium">
+                  Storybook is being created
+                </p>
                 <p className="text-sm text-slate-400 mt-2">
                   The scenes are still being generated. Check back soon!
                 </p>

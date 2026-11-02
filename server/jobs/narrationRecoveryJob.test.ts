@@ -58,6 +58,7 @@ vi.mock("../services/ttsService", () => ({
 vi.mock("../services/videoComposition", () => ({ composeStorybookVideo: mocks.composeStorybookVideo }));
 vi.mock("../storage", () => ({ storagePut: mocks.storagePut }));
 vi.mock("../services/storageNamespace", () => ({ getStorageNamespace: mocks.getStorageNamespace }));
+vi.mock("../services/musicAssets", () => ({ getOrderExperience: async () => null }));
 vi.mock("nanoid", () => ({ nanoid: mocks.nanoid }));
 
 import {
