@@ -101,75 +101,61 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("storybook saved-recording narration retry", () => {
-  it("never starts a narration retry while the owned Storybook SSR renders", () => {
+describe("storybook saved-recording narration recovery removal", () => {
+  it("does not expose retry controls, confirmation text, or recovery hooks for a paid recorded story", () => {
     const html = renderStorybook();
 
-    expect(html).toContain("Retry My Voice");
+    expect(html).not.toContain("Retry My Voice");
+    expect(html).not.toContain("Use My Voice");
+    expect(html).not.toContain("Uses ElevenLabs credits");
     expect(mocks.retryNarration).not.toHaveBeenCalled();
+    expect(mocks.mutate).not.toHaveBeenCalled();
+    expect(storybookSource).not.toContain("retryOwnNarration");
+    expect(storybookSource).not.toContain("handleRetryOwnNarration");
+    expect(storybookSource).not.toContain("showNarrationRetryConfirm");
+    expect(storybookSource).not.toContain("setShowNarrationRetryConfirm");
+    expect(storybookSource).not.toMatch(/\bMic\b/);
+    expect(storybookSource).not.toContain("ElevenLabs");
   });
 
-  it("shows the control only for a paid, approved story with a saved recording", () => {
-    expect(renderStorybook()).toContain("Retry My Voice");
+  it("keeps retry and confirmation UI absent in every former eligibility state", () => {
+    const formerlyEligibleVariants = [
+      { voiceSampleKey: null, voiceSampleUrl: null },
+      { paymentStatus: "unpaid", voiceSampleKey: "orders/22/voice.webm" },
+      { paymentStatus: "paid", storyApproved: false },
+      { narrationRetryPending: true },
+    ];
 
-    mocks.order = { ...mocks.order, voiceSampleKey: null, voiceSampleUrl: null };
-    expect(renderStorybook()).not.toContain("Retry My Voice");
+    for (const variant of formerlyEligibleVariants) {
+      mocks.order = { ...mocks.order, ...variant };
+      const html = renderStorybook();
 
-    mocks.order = { ...mocks.order, paymentStatus: "unpaid", voiceSampleKey: "orders/22/voice.webm" };
-    expect(renderStorybook()).not.toContain("Retry My Voice");
+      expect(html).not.toContain("Retry My Voice");
+      expect(html).not.toContain("Use My Voice");
+      expect(html).not.toContain("Uses ElevenLabs credits");
+    }
 
-    mocks.order = { ...mocks.order, paymentStatus: "paid", storyApproved: false };
-    expect(renderStorybook()).not.toContain("Retry My Voice");
-  });
-
-  it("keeps the retry control visible but disabled until the canonical MP4 key is ready", () => {
-    mocks.order = { ...mocks.order, videoKey: null, videoUrl: "https://signed.example.invalid/stale.mp4" };
-
-    const html = renderStorybook();
-
-    expect(html).toContain("Waiting for the current MP4 to finish.");
-    expect(html).toMatch(/<button[^>]*disabled[^>]*>[\s\S]*?Retry My Voice<\/button>/);
     expect(mocks.retryNarration).not.toHaveBeenCalled();
+    expect(mocks.mutate).not.toHaveBeenCalled();
   });
 
-  it("reports an in-progress narration update while leaving the current MP4 available", () => {
+  it("retains the narration-pending regeneration guard without starting recovery work during SSR", () => {
     mocks.order = { ...mocks.order, narrationRetryPending: true };
 
     const html = renderStorybook();
 
-    expect(html).toContain("Narration update in progress");
-    expect(html).toContain("Your existing video and downloads remain available while the replacement is being prepared.");
-    expect(html).toContain("Download MP4");
+    expect(storybookSource).toContain(
+      "const narrationRetryInProgress = Boolean(order?.narrationRetryPending)"
+    );
+    expect(html).not.toContain("Retry My Voice");
+    expect(html).not.toContain("Use My Voice");
     expect(mocks.retryNarration).not.toHaveBeenCalled();
-  });
-
-  it("requires the ElevenLabs confirmation and only sends the explicit confirmed guest-capable mutation", () => {
-    const retryMutation = storybookSource.slice(
-      storybookSource.indexOf("const retryOwnNarration"),
-      storybookSource.indexOf("// Share link")
-    );
-    const retryHandler = storybookSource.slice(
-      storybookSource.indexOf("const handleRetryOwnNarration"),
-      storybookSource.indexOf("// Auth loading")
-    );
-    const retryPanel = storybookSource.slice(
-      storybookSource.indexOf("Uses ElevenLabs credits"),
-      storybookSource.indexOf("{/* Download Section")
-    );
-
-    expect(retryPanel).toContain("Uses ElevenLabs credits to replace narration using your saved recording. The story/images and payment are unchanged; current video stays available until replacement is ready.");
-    expect(retryPanel).toContain("Use My Voice");
-    expect(retryPanel).toContain("onClick={handleRetryOwnNarration}");
-    expect(retryPanel).toContain("onClick={() => setShowNarrationRetryConfirm(false)}");
-    expect(retryHandler).toContain("retryOwnNarration.mutate({");
-    expect(retryHandler).toContain("guestToken: guestToken || undefined");
-    expect(retryHandler).toContain("confirm: true");
-    expect(retryMutation).toContain("await refetchOrder()");
-    expect(retryMutation).toContain("toast.info(");
-    expect(retryMutation).not.toContain("toast.success(");
+    expect(mocks.mutate).not.toHaveBeenCalled();
   });
 
   it("preserves the server-MP4-only download readiness behavior", () => {
+    expect(renderStorybook()).toContain("Download MP4");
+
     mocks.order = { ...mocks.order, videoKey: null, videoUrl: "https://signed.example.invalid/stale.mp4" };
 
     const html = renderStorybook();

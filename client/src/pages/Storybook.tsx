@@ -16,7 +16,6 @@ import {
   Image as ImageIcon,
   UserPlus,
   RotateCcw,
-  Mic,
 } from "lucide-react";
 import { toast } from "sonner";
 import { StoryPlayer } from "@/components/StoryPlayer";
@@ -33,7 +32,6 @@ export default function StorybookPage() {
   const [downloading, setDownloading] = useState<string | null>(null);
   const [videoStatus, setVideoStatus] = useState("");
   const [showRegenConfirm, setShowRegenConfirm] = useState(false);
-  const [showNarrationRetryConfirm, setShowNarrationRetryConfirm] = useState(false);
 
   // Get guest token for this order: first from localStorage, then from URL params as fallback
   const urlGuestToken = params.get("guestToken");
@@ -90,17 +88,6 @@ export default function StorybookPage() {
     onError: (err) => {
       toast.error(err.message);
       setShowRegenConfirm(false);
-    },
-  });
-
-  const retryOwnNarration = trpc.orders.retryOwnNarration.useMutation({
-    onSuccess: async () => {
-      setShowNarrationRetryConfirm(false);
-      await refetchOrder();
-      toast.info("Narration update queued. Your current video will stay available until the replacement is ready.");
-    },
-    onError: (err) => {
-      toast.error(err.message);
     },
   });
 
@@ -185,15 +172,6 @@ export default function StorybookPage() {
     }
   };
 
-  const handleRetryOwnNarration = () => {
-    if (!narrationRetryReady) return;
-    retryOwnNarration.mutate({
-      orderId,
-      guestToken: guestToken || undefined,
-      confirm: true,
-    });
-  };
-
   // Auth loading (brief)
   if (authLoading) {
     return (
@@ -261,20 +239,8 @@ export default function StorybookPage() {
   ).length || 0;
   const hasVideoKey = Boolean(order?.videoKey);
   const videoViewingUnavailable = hasVideoKey && Boolean(order?.videoAccessError);
-  const hasSavedVoiceRecording = Boolean(order?.voiceSampleKey || order?.voiceSampleUrl);
-  const canRetryOwnNarration = Boolean(
-    order?.paymentStatus === "paid" && order?.storyApproved && hasSavedVoiceRecording
-  );
-  const narrationRetryInProgress = Boolean(
-    order?.narrationRetryPending || retryOwnNarration.isPending
-  );
-  const narrationRetryReady = Boolean(
-    canRetryOwnNarration &&
-      hasVideoKey &&
-      order?.status === "completed" &&
-      !order?.videoGenerating &&
-      !narrationRetryInProgress
-  );
+  // Keep the existing regeneration guard for any already-running recovery.
+  const narrationRetryInProgress = Boolean(order?.narrationRetryPending);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
@@ -396,92 +362,6 @@ export default function StorybookPage() {
               storyTheme={order?.storyTheme}
               isLoading={false}
             />
-
-            {/* Saved-recording narration recovery is always explicit and never runs on page load. */}
-            {canRetryOwnNarration && (
-              <Card className="bg-gradient-to-r from-indigo-900/50 to-purple-900/50 border-indigo-400/30">
-                <CardContent className="pt-6 space-y-4">
-                  <div>
-                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                      <Mic className="w-5 h-5 text-indigo-300" />
-                      Retry My Voice
-                    </h3>
-                    <p className="text-sm text-indigo-100/80 mt-1">
-                      Replace the narration using the recording you already saved for this story.
-                    </p>
-                  </div>
-
-                  {narrationRetryInProgress && (
-                    <div role="status" className="rounded-lg border border-indigo-300/30 bg-indigo-950/50 px-4 py-3 flex gap-3">
-                      <Loader2 className="w-5 h-5 animate-spin text-indigo-300 flex-shrink-0 mt-0.5" />
-                      <div>
-                        <p className="font-medium text-indigo-100">Narration update in progress</p>
-                        <p className="text-sm text-indigo-200/80 mt-1">
-                          Your existing video and downloads remain available while the replacement is being prepared. This page will update when it is ready.
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                  {!narrationRetryInProgress && order?.narrationRetryError && (
-                    <div role="alert" className="rounded-lg border border-amber-300/30 bg-amber-950/30 px-4 py-3">
-                      <p className="font-medium text-amber-100">Your voice update could not be completed</p>
-                      <p className="text-sm text-amber-100/80 mt-1">{order.narrationRetryError}</p>
-                      <p className="text-sm text-amber-100/70 mt-1">Your existing video remains available.</p>
-                    </div>
-                  )}
-
-                  {!hasVideoKey || order?.status !== "completed" ? (
-                    <p className="text-sm text-indigo-100/80">
-                      Waiting for the current MP4 to finish. Retry My Voice will be ready after the completed video is available.
-                    </p>
-                  ) : order?.videoGenerating ? (
-                    <p className="text-sm text-indigo-100/80">
-                      Current video work is still running. Retry My Voice will be ready when it finishes.
-                    </p>
-                  ) : null}
-
-                  {showNarrationRetryConfirm ? (
-                    <div className="rounded-lg border border-indigo-300/30 bg-slate-950/30 p-4 space-y-3">
-                      <p className="text-sm text-slate-100">
-                        Uses ElevenLabs credits to replace narration using your saved recording. The story/images and payment are unchanged; current video stays available until replacement is ready.
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => setShowNarrationRetryConfirm(false)}
-                          disabled={retryOwnNarration.isPending}
-                          className="text-slate-300 hover:text-white"
-                        >
-                          Cancel
-                        </Button>
-                        <Button
-                          size="sm"
-                          onClick={handleRetryOwnNarration}
-                          disabled={!narrationRetryReady}
-                          className="bg-indigo-600 hover:bg-indigo-700 text-white"
-                        >
-                          {retryOwnNarration.isPending && <Loader2 className="w-4 h-4 mr-1 animate-spin" />}
-                          Use My Voice
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setShowNarrationRetryConfirm(true)}
-                      disabled={!narrationRetryReady}
-                      className="border-indigo-300/50 text-indigo-100 hover:bg-indigo-900/30"
-                    >
-                      <Mic className="w-4 h-4 mr-1" />
-                      Retry My Voice
-                    </Button>
-                  )}
-                </CardContent>
-              </Card>
-            )}
 
             {/* Download Section - only for paid orders with completed content */}
             {order?.paymentStatus === "paid" && (order?.generatedImageUrl || allScenesCompleted) && (
