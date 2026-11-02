@@ -6,6 +6,7 @@ vi.mock("../services/privateMediaDelivery", () => ({ privateMediaUrl: m.sign, pr
 vi.mock("../jobs/previewGenerationJob", () => ({ schedulePreviewGeneration: vi.fn(), isPreviewGenerating: () => false }));
 vi.mock("../jobs/storyGenerationJob", () => ({ scheduleStoryGeneration: vi.fn() }));
 vi.mock("../jobs/videoGenerationJob", () => ({ scheduleVideoGeneration: vi.fn(), isVideoGenerating: () => false }));
+vi.mock("../jobs/narrationRecoveryJob", () => ({ scheduleNarrationRecovery: vi.fn(), isNarrationRecovering: () => false, getNarrationRecoveryState: () => ({ pending: false, error: null }) }));
 vi.mock("../jobs/imageGenerationJob", () => ({ scheduleImageGeneration: m.image }));
 vi.mock("../services/ttsService", () => ({ getAvailableVoices: () => [] }));
 vi.mock("../services/storyGeneration", () => ({ getAvailableThemes: () => [] }));

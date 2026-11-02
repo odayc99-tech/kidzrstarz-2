@@ -25,6 +25,7 @@ import { PRODUCTS } from "../stripe-products";
 import { schedulePreviewGeneration, isPreviewGenerating } from "../jobs/previewGenerationJob";
 import { scheduleStoryGeneration } from "../jobs/storyGenerationJob";
 import { scheduleVideoGeneration, isVideoGenerating } from "../jobs/videoGenerationJob";
+import { scheduleNarrationRecovery, isNarrationRecovering, getNarrationRecoveryState } from "../jobs/narrationRecoveryJob";
 import { getAvailableVoices } from "../services/ttsService";
 import { getAvailableThemes } from "../services/storyGeneration";
 import { getStorageNamespace } from "../services/storageNamespace";
@@ -66,6 +67,18 @@ async function verifyOrderAccess(
     message: "Order not found or unauthorized",
   });
 }
+
+function narrationRetryPending(order: NonNullable<Awaited<ReturnType<typeof getOrderById>>>): boolean {
+  return isNarrationRecovering(order.id) || getNarrationRecoveryState(order).pending;
+}
+
+function assertNarrationRetryIdle(order: NonNullable<Awaited<ReturnType<typeof getOrderById>>>) {
+  if (narrationRetryPending(order)) {
+    throw new TRPCError({ code: "CONFLICT", message: "Your recorded-voice narration is being updated. Please wait before starting another retry." });
+  }
+}
+
+const narrationRetryTimes = new Map<number, number>();
 
 async function signSceneMedia<T extends { illustrationKey?: string | null; illustrationUrl?: string | null; narrationKey?: string | null; narrationUrl?: string | null }>(scene: T) {
   return {
@@ -288,6 +301,8 @@ export const ordersRouter = router({
       const previewError = order.errorMessage?.startsWith("Preview: ")
         ? order.errorMessage.slice("Preview: ".length)
         : null;
+      const narrationRecovery = getNarrationRecoveryState(order);
+      const narrationPending = narrationRetryPending(order);
       return {
         ...order,
         originalImageUrl,
@@ -302,7 +317,13 @@ export const ordersRouter = router({
         previewError,
         previewGenerating: isPreviewGenerating(input.orderId),
         videoGenerating: isVideoGenerating(input.orderId),
-        errorMessage: order.errorMessage || null,
+        narrationRetryPending: narrationPending,
+        narrationRetryError: narrationRecovery.error,
+        errorMessage: narrationPending
+          ? "Voice: Updating recorded narration. Your existing video remains available."
+          : order.errorMessage?.startsWith("NarrationRecovery: lease:")
+            ? narrationRecovery.error || "The narration update was interrupted. Your existing video is unchanged."
+            : order.errorMessage || null,
       };
     }),
 
@@ -608,9 +629,41 @@ export const ordersRouter = router({
       return Promise.all(scenes.map(signSceneMedia));
     }),
 
-  /**
-   * Manually trigger video generation (supports guest + auth)
-   */
+  /** Recorded-voice recovery only: owner/guest must explicitly confirm credit usage. */
+  retryOwnNarration: publicProcedure
+    .input(z.object({ orderId: z.number().int().positive(), guestToken: z.string().optional(), confirm: z.literal(true) }))
+    .mutation(async ({ ctx, input }) => {
+      const order = await verifyOrderAccess(input.orderId, ctx.user?.id, input.guestToken);
+      if (order.paymentStatus !== "paid" || !order.storyApproved) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "A paid, approved story is required before retrying narration." });
+      }
+      if (!(order.voiceSampleKey || order.voiceSampleUrl)) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "This order has no saved voice recording." });
+      }
+      if (!order.videoKey) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Please wait for the current MP4 to finish before retrying its narration." });
+      }
+      if (order.status !== "completed") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Please wait for the current storybook to complete before retrying its narration." });
+      }
+      assertNarrationRetryIdle(order);
+      if (isVideoGenerating(input.orderId)) {
+        throw new TRPCError({ code: "CONFLICT", message: "Video work is already running. Please wait." });
+      }
+      const now = Date.now();
+      const last = narrationRetryTimes.get(input.orderId);
+      if (last !== undefined && now - last < 60_000) {
+        throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Please wait one minute before retrying narration again." });
+      }
+      if (!scheduleNarrationRecovery(input.orderId)) {
+        throw new TRPCError({ code: "CONFLICT", message: "Narration is already being updated." });
+      }
+      narrationRetryTimes.forEach((time, id) => { if (now - time >= 60_000) narrationRetryTimes.delete(id); });
+      if (narrationRetryTimes.size >= 200) narrationRetryTimes.delete(Array.from(narrationRetryTimes.keys())[0]);
+      narrationRetryTimes.set(input.orderId, now);
+      return { success: true, message: "Recorded-voice narration retry queued. Existing images and story will be kept." };
+    }),
+
   triggerVideoGeneration: publicProcedure
     .input(z.object({
       orderId: z.number(),
@@ -623,6 +676,7 @@ export const ordersRouter = router({
         input.guestToken
       );
 
+      assertNarrationRetryIdle(order);
       if (order.paymentStatus !== "paid") {
         throw new TRPCError({
           code: "BAD_REQUEST",
@@ -829,6 +883,7 @@ export const ordersRouter = router({
         input.guestToken
       );
 
+      assertNarrationRetryIdle(order);
       if (order.paymentStatus !== "paid") {
         throw new TRPCError({
           code: "BAD_REQUEST",

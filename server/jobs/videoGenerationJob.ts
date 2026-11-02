@@ -332,7 +332,7 @@ async function cloneVoiceIfNeeded(
         .where(eq(orders.id, orderId));
       console.log(`[VideoJob] Voice cloned and saved: ${clonedId}`);
     } else {
-      console.warn(`[VideoJob] Voice cloning failed, will use default ElevenLabs or Edge TTS`);
+      throw new Error("Recorded voice cloning failed. Check ElevenLabs capacity and try again.");
     }
   }
 
@@ -824,6 +824,7 @@ CRITICAL RULES:
     try {
       const audioResult = await generateNarration(scene.sceneText, userId, orderId, {
         elevenlabsVoiceId: elevenlabsVoiceId || undefined,
+        requireCustomVoice: Boolean(elevenlabsVoiceId),
       });
       await db
         .update(storyScenes)
@@ -835,6 +836,8 @@ CRITICAL RULES:
         .where(eq(storyScenes.id, sceneId));
       console.log(`[VideoJob] Scene ${scene.sceneIndex} completed with narration`);
     } catch (ttsError) {
+      // A selected recorded voice must not become a stock narrator or silent scene.
+      if (elevenlabsVoiceId) throw ttsError;
       // TTS failed - mark scene as completed anyway (illustration is the key asset).
       console.warn(
         `[VideoJob] TTS failed for scene ${scene.sceneIndex}, marking as completed without audio:`,

@@ -387,4 +387,32 @@ describe("videoGenerationJob paid private-S3 repair", () => {
     expect(database.orderSets).not.toContainEqual(expect.objectContaining({ status: "completed" }));
     expect(database.orderSets).toContainEqual({ status: "failed" });
   });
+
+  it("does not generate new scenes with a stock narrator when selected voice cloning fails", async () => {
+    const database = createDatabase();
+    mocks.getDb.mockResolvedValue(database.db);
+    mocks.getOrderById.mockResolvedValue(order({ voiceSampleKey: "orders/22/voice.webm" }));
+    mocks.cloneVoiceWithElevenLabs.mockResolvedValue(null);
+    await expect(processVideoGeneration(22)).rejects.toThrow("Recorded voice cloning failed");
+    expect(mocks.generateImage).not.toHaveBeenCalled();
+    expect(mocks.generateNarration).not.toHaveBeenCalled();
+    expect(mocks.composeStorybookVideo).not.toHaveBeenCalled();
+  });
+
+  it("preserves an existing illustration and fails instead of silently completing a custom-voice audio failure", async () => {
+    const database = createDatabase([{
+      id: 1, orderId: 22, sceneIndex: 0, sceneText: "Ready image", illustrationPrompt: "Ready image",
+      illustrationKey: "orders/22/scenes/ready.png", illustrationUrl: "https://metadata.invalid/ready.png",
+      narrationKey: null, narrationUrl: null, status: "generating_audio",
+    }]);
+    mocks.getDb.mockResolvedValue(database.db);
+    mocks.getOrderById.mockResolvedValue(order({ elevenlabsVoiceId: "OWN_VOICE_ONLY", voiceSampleKey: "orders/22/voice.webm" }));
+    mocks.generateNarration.mockRejectedValue(new Error("Custom narrator unavailable"));
+    await expect(processVideoGeneration(22, { retryMissingScenes: true })).rejects.toThrow("incomplete or missing illustrations");
+    expect(mocks.generateNarration).toHaveBeenCalledWith("Ready image", 7, 22, { elevenlabsVoiceId: "OWN_VOICE_ONLY", requireCustomVoice: true });
+    expect(mocks.generateImage).not.toHaveBeenCalled();
+    expect(mocks.composeStorybookVideo).not.toHaveBeenCalled();
+    expect(database.scenes[0].illustrationKey).toBe("orders/22/scenes/ready.png");
+    expect(database.scenes[0].status).toBe("failed");
+  });
 });

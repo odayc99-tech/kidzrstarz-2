@@ -40,6 +40,7 @@ vi.mock("@/lib/trpc", () => ({
       },
       triggerVideoGeneration: { useMutation: () => ({ mutate: mocks.mutate, mutateAsync: mocks.mutate, isPending: false }) },
       regenerateStorybookStory: { useMutation: () => ({ mutate: mocks.mutate, mutateAsync: mocks.mutate, isPending: false }) },
+      retryOwnNarration: { useMutation: () => ({ mutate: mocks.mutate, mutateAsync: mocks.mutate, isPending: false }) },
       generateShareLink: { useMutation: () => ({ mutate: mocks.mutate, mutateAsync: mocks.mutate, isPending: false }) },
       getCharacterDownloadUrl: { useMutation: () => ({ mutate: mocks.mutate, mutateAsync: mocks.mutate, isPending: false }) },
       getVideoDownloadUrl: { useMutation: () => ({ mutate: mocks.mutate, mutateAsync: mocks.mutate, isPending: false }) },

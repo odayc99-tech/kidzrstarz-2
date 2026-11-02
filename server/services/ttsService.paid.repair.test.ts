@@ -39,7 +39,7 @@ vi.mock("nanoid", () => ({ nanoid: mocks.nanoid }));
 vi.mock("edge-tts-universal", () => ({ EdgeTTS: class {} }));
 vi.mock("./storageNamespace", () => ({ getStorageNamespace: vi.fn(() => "orders/22") }));
 
-import { cloneVoiceWithElevenLabs } from "./ttsService";
+import { cloneVoiceWithElevenLabs, generateNarration } from "./ttsService";
 
 describe("ttsService paid private-S3 voice repair", () => {
   beforeEach(() => {
@@ -118,6 +118,54 @@ describe("ttsService paid private-S3 voice repair", () => {
       "files",
       Buffer.from("legacy-voice"),
       { filename: "voice-sample.ogg", contentType: "audio/ogg" }
+    );
+  });
+
+  it("requires a configured cloned voice in strict custom-voice mode and never reaches fallback providers", async () => {
+    await expect(generateNarration("A gentle hello.", 7, 22, {
+      requireCustomVoice: true,
+    })).rejects.toThrow("Custom voice narration is unavailable");
+
+    expect(mocks.axiosPost).not.toHaveBeenCalled();
+    expect(mocks.storagePut).not.toHaveBeenCalled();
+  });
+
+  it("does not fall back to a stock or Edge voice when the selected custom voice fails", async () => {
+    mocks.axiosPost.mockRejectedValue(new Error("quota exhausted"));
+
+    await expect(generateNarration("A gentle hello.", 7, 22, {
+      elevenlabsVoiceId: "saved-custom-voice",
+      requireCustomVoice: true,
+    })).rejects.toThrow("Custom voice narration failed");
+
+    expect(mocks.axiosPost).toHaveBeenCalledTimes(1);
+    expect(mocks.axiosPost).toHaveBeenCalledWith(
+      expect.stringContaining("/text-to-speech/saved-custom-voice"),
+      expect.anything(),
+      expect.anything()
+    );
+    expect(mocks.storagePut).not.toHaveBeenCalled();
+  });
+
+  it("uses only the supplied custom ElevenLabs voice when strict narration succeeds", async () => {
+    mocks.axiosPost.mockResolvedValue({ data: Buffer.from("strict-custom-audio") });
+    mocks.storagePut.mockResolvedValue({
+      key: "orders/22/narration/custom.mp3",
+      url: "https://metadata.invalid/custom.mp3",
+    });
+
+    await expect(generateNarration("A gentle hello.", 7, 22, {
+      elevenlabsVoiceId: "saved-custom-voice",
+      requireCustomVoice: true,
+    })).resolves.toEqual({
+      audioKey: "orders/22/narration/abc123-elevenlabs-narration.mp3",
+      audioUrl: "https://metadata.invalid/custom.mp3",
+    });
+
+    expect(mocks.axiosPost).toHaveBeenCalledWith(
+      expect.stringContaining("/text-to-speech/saved-custom-voice"),
+      expect.objectContaining({ text: "A gentle hello." }),
+      expect.anything()
     );
   });
 });

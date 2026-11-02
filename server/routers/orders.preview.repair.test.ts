@@ -16,6 +16,7 @@ vi.mock("../storage", () => ({
 vi.mock("../jobs/previewGenerationJob", () => ({ schedulePreviewGeneration: mocks.schedule, isPreviewGenerating: mocks.generating }));
 vi.mock("../jobs/storyGenerationJob", () => ({ scheduleStoryGeneration: vi.fn() }));
 vi.mock("../jobs/videoGenerationJob", () => ({ scheduleVideoGeneration: vi.fn(), isVideoGenerating: () => false }));
+vi.mock("../jobs/narrationRecoveryJob", () => ({ scheduleNarrationRecovery: vi.fn(), isNarrationRecovering: () => false, getNarrationRecoveryState: () => ({ pending: false, error: null }) }));
 vi.mock("../services/ttsService", () => ({ getAvailableVoices: () => [] }));
 vi.mock("../services/storyGeneration", () => ({ getAvailableThemes: () => [] }));
 vi.mock("../services/storageNamespace", () => ({ getStorageNamespace: () => "mock" }));

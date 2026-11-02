@@ -218,6 +218,10 @@ async function generateWithEdgeTTS(
  * 1. If elevenlabsVoiceId is provided (cloned voice), use ElevenLabs TTS with that voice
  * 2. If ElevenLabs API key exists but no cloned voice, use ElevenLabs default voice
  * 3. Fall back to Edge TTS with a cheerful voice
+ *
+ * requireCustomVoice is for explicit customer-recording recovery only. It
+ * never substitutes a stock ElevenLabs or Edge voice when cloning/configuration
+ * is unavailable or the custom voice request fails.
  */
 export async function generateNarration(
   text: string,
@@ -226,9 +230,25 @@ export async function generateNarration(
   options?: {
     elevenlabsVoiceId?: string;
     edgeVoice?: string;
+    requireCustomVoice?: boolean;
   }
 ): Promise<{ audioUrl: string; audioKey: string }> {
   const apiKey = ELEVENLABS_API_KEY();
+
+  if (options?.requireCustomVoice) {
+    if (!apiKey || !options.elevenlabsVoiceId) {
+      throw new Error("Custom voice narration is unavailable");
+    }
+
+    try {
+      return await generateWithElevenLabs(text, options.elevenlabsVoiceId, userId, orderId);
+    } catch {
+      // Keep this error safe: callers should not expose provider payloads, and
+      // strict recovery must never silently fall back to a stock/Edge voice.
+      console.warn("[TTS] Custom voice narration failed");
+      throw new Error("Custom voice narration failed");
+    }
+  }
 
   // Priority 1: Use ElevenLabs with cloned voice
   if (options?.elevenlabsVoiceId && apiKey) {
