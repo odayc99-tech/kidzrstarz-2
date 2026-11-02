@@ -160,4 +160,14 @@ describe("videoComposition paid private-S3 repair", () => {
     expect(commands.find(command => command.includes("-f concat"))).toContain("-movflags +faststart");
     vi.unstubAllGlobals();
   });
+
+  it("rejects empty composition output instead of reporting a successful video", async () => {
+    mocks.readFile.mockResolvedValue(Buffer.alloc(0));
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 503 }));
+    await expect(composeStorybookVideo([
+      { sceneIndex: 0, illustrationKey: "7/scene.png" },
+    ], "adventure")).rejects.toThrow("empty MP4");
+    expect(mocks.rm).toHaveBeenCalledWith("/tmp/storybook-private-test", { recursive: true, force: true });
+    vi.unstubAllGlobals();
+  });
 });

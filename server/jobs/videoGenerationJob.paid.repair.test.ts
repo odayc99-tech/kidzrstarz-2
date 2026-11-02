@@ -371,4 +371,20 @@ describe("videoGenerationJob paid private-S3 repair", () => {
     expect(mocks.generateNarration).not.toHaveBeenCalled();
     expect(mocks.composeStorybookVideo).toHaveBeenCalledOnce();
   });
+
+  it("does not upload or complete an empty MP4 from existing completed assets", async () => {
+    const database = createDatabase([{
+      id: 1, orderId: 22, sceneIndex: 0, sceneText: "Ready assets", illustrationPrompt: "Ready assets",
+      illustrationKey: "orders/22/scenes/ready.png", illustrationUrl: "https://metadata.invalid/ready.png",
+      narrationKey: "orders/22/narration/ready.mp3", narrationUrl: "https://metadata.invalid/ready.mp3", status: "completed",
+    }]);
+    mocks.getDb.mockResolvedValue(database.db);
+    mocks.composeStorybookVideo.mockResolvedValue(Buffer.alloc(0));
+    await expect(processVideoGeneration(22)).rejects.toThrow("empty MP4");
+    expect(mocks.storagePut).not.toHaveBeenCalled();
+    expect(mocks.generateImage).not.toHaveBeenCalled();
+    expect(mocks.generateNarration).not.toHaveBeenCalled();
+    expect(database.orderSets).not.toContainEqual(expect.objectContaining({ status: "completed" }));
+    expect(database.orderSets).toContainEqual({ status: "failed" });
+  });
 });

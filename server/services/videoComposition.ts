@@ -231,6 +231,9 @@ export async function composeStorybookVideo(
 
     // ─── Step 5: Read and return the final video ─────────────────────
     const videoBuffer = await fs.readFile(finalPath);
+    if (videoBuffer.length === 0) {
+      throw new Error("Video composition returned an empty MP4");
+    }
     console.log(`[VideoCompose] Final video size: ${(videoBuffer.length / 1024 / 1024).toFixed(1)}MB`);
 
     return videoBuffer;

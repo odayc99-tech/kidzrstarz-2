@@ -21,42 +21,7 @@ import { toast } from "sonner";
 import { StoryPlayer } from "@/components/StoryPlayer";
 import { useState, useCallback, useMemo } from "react";
 import { getGuestToken, saveGuestToken } from "@/lib/guestToken";
-import { composeVideoInBrowser } from "@/lib/videoComposer";
-import { THEME_BGM, DEFAULT_BGM_VOLUME } from "@/data/themeBgm";
-
-/**
- * Download a file using the server-side proxy to bypass CORS issues.
- * Falls back to direct URL if proxy fails.
- */
-async function downloadFile(url: string, filename: string, proxyUrl?: string) {
-  const downloadUrl = proxyUrl || url;
-  try {
-    const response = await fetch(downloadUrl);
-    if (!response.ok) throw new Error(`Download failed: ${response.status}`);
-    const blob = await response.blob();
-    const blobUrl = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = blobUrl;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(blobUrl);
-  } catch {
-    // Fallback: try direct link, then open in new tab
-    try {
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = filename;
-      a.target = "_blank";
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-    } catch {
-      window.open(url, "_blank");
-    }
-  }
-}
+import { downloadFile } from "@/lib/downloadFile";
 
 export default function StorybookPage() {
   const { user, isAuthenticated, loading: authLoading, openSignIn } = useAuth();
@@ -65,7 +30,6 @@ export default function StorybookPage() {
   const orderId = parseInt(params.get("orderId") || "0");
   const [justCopied, setJustCopied] = useState(false);
   const [downloading, setDownloading] = useState<string | null>(null);
-  const [videoProgress, setVideoProgress] = useState(0);
   const [videoStatus, setVideoStatus] = useState("");
   const [showRegenConfirm, setShowRegenConfirm] = useState(false);
 
@@ -169,70 +133,33 @@ export default function StorybookPage() {
 
   const handleDownloadVideo = useCallback(async () => {
     if (!orderId) return;
-    setDownloading("video");
-    setVideoProgress(0);
-    setVideoStatus("Preparing download...");
-    try {
-      // Prefer server-generated MP4 (already composed with narration + BGM)
-      if (order?.videoUrl) {
-        setVideoStatus("Getting download link...");
-        const { downloadUrl, filename } = await getVideoDownloadUrl.mutateAsync({
-          orderId,
-          guestToken: guestToken || undefined,
-        });
-        setVideoStatus("Downloading MP4...");
-        await downloadFile(downloadUrl, filename);
-        toast.success("Storybook video downloaded!");
-        return;
-      }
 
-      // Fallback: client-side composition if server video not ready yet
-      if (!scenes || scenes.length === 0) {
-        toast.error("No scenes available to download.");
-        return;
-      }
-      const completedScenes = scenes.filter(
-        (s) => s.status === "completed" && s.illustrationUrl
-      );
-      if (completedScenes.length === 0) {
-        toast.error("No completed scenes to download.");
-        return;
-      }
-      const theme = order?.storyTheme || "adventure";
-      const bgmConfig = THEME_BGM[theme] || THEME_BGM.adventure;
-      const videoBlob = await composeVideoInBrowser({
-        scenes: completedScenes.map((s) => ({
-          illustrationUrl: s.illustrationUrl!,
-          narrationUrl: s.narrationUrl,
-          sceneText: s.sceneText,
-        })),
-        bgmUrl: bgmConfig.url,
-        bgmVolume: DEFAULT_BGM_VOLUME,
-        onProgress: (progress, status) => {
-          setVideoProgress(Math.round(progress));
-          setVideoStatus(status);
-        },
+    // videoKey is the canonical signal that the server-composed MP4 exists.
+    // A viewing URL can be unavailable temporarily while its authorized download remains valid.
+    if (!order?.videoKey) {
+      toast.info("Your final MP4 is still being prepared. Refreshing its status...");
+      void refetchOrder();
+      return;
+    }
+
+    setDownloading("video");
+    setVideoStatus("Getting secure download link...");
+    try {
+      const { downloadUrl, filename } = await getVideoDownloadUrl.mutateAsync({
+        orderId,
+        guestToken: guestToken || undefined,
       });
-      const childName = order?.childName || "storybook";
-      const safeName = childName.replace(/[^a-zA-Z0-9]/g, "_").toLowerCase();
-      const blobUrl = URL.createObjectURL(videoBlob);
-      const a = document.createElement("a");
-      a.href = blobUrl;
-      a.download = `${safeName}_storybook.mp4`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(blobUrl);
+      setVideoStatus("Downloading MP4...");
+      await downloadFile(downloadUrl, filename);
       toast.success("Storybook video downloaded!");
     } catch (err: any) {
       console.error("Video download failed:", err);
       toast.error(`Video download failed: ${err.message || "Unknown error"}. Please try again.`);
     } finally {
       setDownloading(null);
-      setVideoProgress(0);
       setVideoStatus("");
     }
-  }, [scenes, order, orderId, guestToken, getVideoDownloadUrl]);
+  }, [order?.videoKey, orderId, guestToken, getVideoDownloadUrl, refetchOrder]);
 
   const handleRegenerate = () => {
     if (showRegenConfirm) {
@@ -310,6 +237,8 @@ export default function StorybookPage() {
   const completedSceneCount = scenes?.filter(
     (s) => s.status === "completed" && s.illustrationUrl
   ).length || 0;
+  const hasVideoKey = Boolean(order?.videoKey);
+  const videoViewingUnavailable = hasVideoKey && Boolean(order?.videoAccessError);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
@@ -460,24 +389,19 @@ export default function StorybookPage() {
                       </Button>
                     )}
 
-                    {/* Create & Download Video (client-side composition) */}
+                    {/* Download the server-composed MP4 only after its canonical key is available. */}
                     {allScenesCompleted && (
                       <Button
                         onClick={handleDownloadVideo}
-                        disabled={downloading === "video"}
+                        disabled={downloading === "video" || !hasVideoKey}
                         className="w-full bg-gradient-to-r from-pink-600 to-pink-700 hover:from-pink-700 hover:to-pink-800 text-white h-auto py-3 relative overflow-hidden"
                       >
                         {downloading === "video" ? (
                           <>
-                            {/* Progress bar background */}
-                            <div
-                              className="absolute inset-0 bg-pink-400/20 transition-all duration-300"
-                              style={{ width: `${videoProgress}%` }}
-                            />
                             <div className="relative flex items-center w-full">
                               <Loader2 className="w-5 h-5 mr-2 animate-spin flex-shrink-0" />
                               <div className="text-left min-w-0">
-                                <div className="font-semibold">{videoProgress}% — Creating Video</div>
+                                <div className="font-semibold">Downloading MP4</div>
                                 <div className="text-xs opacity-75 truncate">{videoStatus}</div>
                               </div>
                             </div>
@@ -486,9 +410,11 @@ export default function StorybookPage() {
                           <>
                             <Film className="w-5 h-5 mr-2" />
                             <div className="text-left">
-                              <div className="font-semibold">Create & Download Video</div>
+                              <div className="font-semibold">{hasVideoKey ? "Download MP4" : "Preparing MP4"}</div>
                               <div className="text-xs opacity-75">
-                                {order?.videoUrl ? "MP4 with narration & music" : "Compose & download video"}
+                                {hasVideoKey
+                                  ? "MP4 with narration & music"
+                                  : "Your scenes are ready. Final MP4 preparation is in progress."}
                               </div>
                             </div>
                           </>
@@ -496,9 +422,16 @@ export default function StorybookPage() {
                       </Button>
                     )}
                   </div>
+                  {videoViewingUnavailable && (
+                    <p className="text-xs text-purple-200/80 mt-3 text-center">
+                      {order?.videoAccessError} You can still download the completed MP4.
+                    </p>
+                  )}
                   <p className="text-xs text-purple-300/60 mt-3 text-center">
                     {allScenesCompleted
-                      ? "Create a full storybook video with narration and background music right in your browser, or download the high-res character image."
+                      ? hasVideoKey
+                        ? "Download your completed storybook MP4 with narration and background music, or download the high-res character image."
+                        : "Your scenes are complete. The final MP4 is still being prepared; this page will update when it is ready to download."
                       : "Download your high-res animated character image. Video creation will be available once all scenes are generated."}
                   </p>
                 </CardContent>

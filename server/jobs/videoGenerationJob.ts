@@ -624,6 +624,9 @@ async function composeFullVideo(orderId: number, userId: number | null, storyThe
   }));
 
   const videoBuffer = await composeStorybookVideo(sceneAssets, storyTheme);
+  if (videoBuffer.length === 0) {
+    throw new Error("Video composition returned an empty MP4");
+  }
 
   // Upload to S3 and persist the key returned by storage, never a locally
   // assumed destination key.
