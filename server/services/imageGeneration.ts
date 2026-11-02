@@ -1,5 +1,5 @@
 import { generateImage } from "../_core/imageGeneration";
-import { storagePut } from "../storage";
+import { storagePut, storageReadBytes } from "../storage";
 import { nanoid } from "nanoid";
 import { applyBrandWatermark } from "./watermark";
 import { getStorageNamespace } from "./storageNamespace";
@@ -8,16 +8,18 @@ import { getStorageNamespace } from "./storageNamespace";
  * Generate a 3D animated character image from an original photo.
  * The prompt is crafted to ensure the AI actually transforms the child
  * into a 3D animated character rather than returning the original photo.
- * 
+ *
  * @param childDescription - Optional description of the child (height, build, hair, etc.)
  *                           to improve character accuracy.
+ * @param originalImageKey - Optional canonical private storage key for the original photo.
  */
 export async function generatePixarCharacter(
   originalImageUrl: string,
   childName: string,
   userId: number | null,
   orderId: number,
-  childDescription?: string | null
+  childDescription?: string | null,
+  originalImageKey?: string | null
 ): Promise<{ imageUrl: string; imageKey: string }> {
   try {
     console.log(`[ImageGeneration] Starting 3D animated character transformation for ${childName}`);
@@ -47,27 +49,37 @@ Character name: ${childName}`;
     const result = await generateImage({
       prompt,
       originalImages: [
-        {
-          url: originalImageUrl,
-          mimeType: "image/jpeg",
-        },
+        originalImageKey
+          ? {
+              storageKey: originalImageKey,
+              mimeType: "image/jpeg",
+            }
+          : {
+              url: originalImageUrl,
+              mimeType: "image/jpeg",
+            },
       ],
     });
 
-    if (!result.url) {
-      throw new Error("Image generation returned no URL");
+    let generatedBuffer: Buffer;
+    if (result.key) {
+      // A canonical result key is authoritative. If this read fails, do not
+      // downgrade to the legacy URL, which may be unsigned or inaccessible.
+      const generatedImage = await storageReadBytes(result.key);
+      generatedBuffer = generatedImage.data;
+    } else if (result.url) {
+      // Preserve compatibility with providers that only return an external URL.
+      const response = await fetch(result.url);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch generated image: ${response.statusText}`);
+      }
+      generatedBuffer = Buffer.from(await response.arrayBuffer());
+    } else {
+      throw new Error("Image generation returned no image");
     }
-
-    // Download the generated image and upload to S3
-    const response = await fetch(result.url);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch generated image: ${response.statusText}`);
-    }
-
-    const buffer = await response.arrayBuffer();
 
     // Apply subtle KidzRstarz brand watermark to final image
-    const brandedBuffer = await applyBrandWatermark(Buffer.from(buffer));
+    const brandedBuffer = await applyBrandWatermark(generatedBuffer);
 
     // Upload to S3 with user/order-specific path
     const ns = getStorageNamespace(userId, orderId);

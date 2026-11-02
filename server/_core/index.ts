@@ -9,7 +9,7 @@ import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { handleStripeWebhook } from "../webhooks/stripe";
 import { injectOgMetaTags } from "../middleware/ogMetaTags";
-import { getOrderById } from "../db";
+import { registerPrivateDownloads } from "../routes/privateDownloads";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -41,78 +41,8 @@ async function startServer() {
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);
-  // Download proxy for video and character image (bypasses CORS)
-  app.get("/api/download/:orderId/:type", async (req, res) => {
-    try {
-      const orderId = parseInt(req.params.orderId);
-      const type = req.params.type; // "video" or "character"
-      if (!orderId || isNaN(orderId)) {
-        return res.status(400).json({ error: "Invalid order ID" });
-      }
-
-      const order = await getOrderById(orderId);
-      if (!order) {
-        return res.status(404).json({ error: "Order not found" });
-      }
-      if (order.paymentStatus !== "paid") {
-        return res.status(403).json({ error: "Order not paid" });
-      }
-
-      let sourceUrl: string | null = null;
-      let filename: string;
-      let contentType: string;
-      const safeName = (order.childName || "storybook").replace(/[^a-zA-Z0-9]/g, "_").toLowerCase();
-
-      if (type === "video") {
-        sourceUrl = order.videoUrl;
-        filename = `${safeName}_storybook.mp4`;
-        contentType = "video/mp4";
-      } else if (type === "character") {
-        sourceUrl = order.generatedImageUrl;
-        filename = `${safeName}_animated_character.png`;
-        contentType = "image/png";
-      } else {
-        return res.status(400).json({ error: "Invalid download type" });
-      }
-
-      if (!sourceUrl) {
-        return res.status(404).json({ error: `${type} not available yet` });
-      }
-
-      // Fetch from S3 and stream to client
-      const upstream = await fetch(sourceUrl);
-      if (!upstream.ok) {
-        return res.status(502).json({ error: "Failed to fetch file from storage" });
-      }
-
-      res.setHeader("Content-Type", contentType);
-      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-      if (upstream.headers.get("content-length")) {
-        res.setHeader("Content-Length", upstream.headers.get("content-length")!);
-      }
-
-      // Stream the response body
-      const reader = upstream.body?.getReader();
-      if (!reader) {
-        return res.status(502).json({ error: "No response body" });
-      }
-
-      const pump = async () => {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          res.write(value);
-        }
-        res.end();
-      };
-      await pump();
-    } catch (error) {
-      console.error("[Download] Error:", error);
-      if (!res.headersSent) {
-        res.status(500).json({ error: "Download failed" });
-      }
-    }
-  });
+  // Legacy download paths now verify ownership and redirect to private attachments.
+  registerPrivateDownloads(app);
 
   // tRPC API
   app.use(

@@ -17,8 +17,9 @@ import {
 import { storyScenes, orders } from "../../drizzle/schema";
 import { eq, asc, desc, sql, and, isNotNull, not } from "drizzle-orm";
 import { storagePut, storageGet, storagePublicUrl, storageGetSignedUrl } from "../storage";
-import { S3Client, HeadObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { privateMediaUrl, privateDownloadUrl } from "../services/privateMediaDelivery";
+import { getPaymentScope, isStripeContextValid } from "../services/paymentContext";
+import { scheduleImageGeneration } from "../jobs/imageGenerationJob";
 import { nanoid } from "nanoid";
 import { PRODUCTS } from "../stripe-products";
 import { schedulePreviewGeneration, isPreviewGenerating } from "../jobs/previewGenerationJob";
@@ -35,22 +36,6 @@ const getStripe = () => {
   }
   return new Stripe(process.env.STRIPE_SECRET_KEY);
 };
-
-/**
- * Helper: Return the public S3 URL for a stored key.
- * Since the bucket has a public-read policy, URLs never expire.
- * Falls back to the stored URL if no key is available.
- */
-function refreshUrl(key: string | null | undefined, url: string | null | undefined): string | null {
-  if (key) {
-    try {
-      return storagePublicUrl(key);
-    } catch {
-      // S3 env vars not set — fall back to stored URL
-    }
-  }
-  return url ?? null;
-}
 
 /**
  * Helper: Verify order access for either logged-in user or guest token.
@@ -80,6 +65,24 @@ async function verifyOrderAccess(
     code: "NOT_FOUND",
     message: "Order not found or unauthorized",
   });
+}
+
+async function signSceneMedia<T extends { illustrationKey?: string | null; illustrationUrl?: string | null; narrationKey?: string | null; narrationUrl?: string | null }>(scene: T) {
+  return {
+    ...scene,
+    illustrationUrl: await privateMediaUrl(scene.illustrationKey, scene.illustrationUrl),
+    narrationUrl: await privateMediaUrl(scene.narrationKey, scene.narrationUrl),
+  };
+}
+
+async function signOrderListMedia<T extends { originalImageKey?: string | null; originalImageUrl?: string | null; previewImageKey?: string | null; previewImageUrl?: string | null; generatedImageKey?: string | null; generatedImageUrl?: string | null; videoKey?: string | null; videoUrl?: string | null }>(order: T) {
+  return {
+    ...order,
+    originalImageUrl: await privateMediaUrl(order.originalImageKey, order.originalImageUrl),
+    previewImageUrl: await privateMediaUrl(order.previewImageKey, order.previewImageUrl),
+    generatedImageUrl: await privateMediaUrl(order.generatedImageKey, order.generatedImageUrl),
+    videoUrl: await privateMediaUrl(order.videoKey, order.videoUrl),
+  };
 }
 
 // Manual preview retries only; bounded memory and no automatic generation on polling.
@@ -229,7 +232,7 @@ export const ordersRouter = router({
       if (
         order.paymentStatus === "paid" &&
         order.storyApproved &&
-        !order.videoUrl &&
+        !(order.videoKey || order.videoUrl) &&
         !order.errorMessage &&
         !isVideoGenerating(input.orderId)
       ) {
@@ -253,7 +256,7 @@ export const ordersRouter = router({
               console.log(`[getOrder] Auto-resuming stuck scene generation for order ${input.orderId} (${stuckScenes.length} scenes stuck)`);
               scheduleVideoGeneration(input.orderId);
             }
-          } else if (order.generatedImageUrl) {
+          } else if (order.generatedImageKey || order.generatedImageUrl) {
             // No scenes yet but image is ready — resume video generation from scratch
             console.log(`[getOrder] Auto-resuming video generation (no scenes yet) for order ${input.orderId}`);
             scheduleVideoGeneration(input.orderId);
@@ -261,46 +264,7 @@ export const ordersRouter = router({
         }
       }
 
-      // If order claims to have a video (videoKey set) but the S3 object is missing,
-      // reset the order so auto-resume can regenerate it.
-      if (order.videoKey && order.status === "completed") {
-        try {
-          const s3Region = process.env.S3_REGION;
-          const s3Bucket = process.env.S3_BUCKET;
-          const awsKeyId = process.env.AWS_ACCESS_KEY_ID;
-          const awsSecret = process.env.AWS_SECRET_ACCESS_KEY;
-          if (s3Region && s3Bucket && awsKeyId && awsSecret) {
-            const s3 = new S3Client({
-              region: s3Region,
-              credentials: { accessKeyId: awsKeyId, secretAccessKey: awsSecret },
-            });
-            await s3.send(new HeadObjectCommand({ Bucket: s3Bucket, Key: order.videoKey.replace(/^\/+/, "") }));
-            // Object exists — no action needed
-          }
-        } catch (headErr: unknown) {
-          const status = (headErr as { $metadata?: { httpStatusCode?: number } })?.$metadata?.httpStatusCode;
-          if (status === 404 || status === 403) {
-            // Video file is missing from S3 — reset order so video is regenerated
-            console.log(`[getOrder] Video file missing from S3 for order ${input.orderId} (${status}), resetting for regeneration`);
-            const db = await getDb();
-            if (db) {
-              await db.update(orders).set({
-                videoKey: null,
-                videoUrl: null,
-                status: "processing",
-                completedAt: null,
-                errorMessage: null,
-              }).where(eq(orders.id, input.orderId));
-              // Reload the order with cleared fields
-              const resetOrder = await getOrderById(input.orderId);
-              if (resetOrder) {
-                Object.assign(order, resetOrder);
-              }
-            }
-          }
-        }
-      }
-
+      // Viewing must never erase/recreate paid assets on an S3 access error.
       // Order ownership/guest access was verified above. Never sign arbitrary client keys.
       // Link failures should not hide the successfully generated story or the whole order.
       let originalImageAccessError: string | null = null;
@@ -317,9 +281,10 @@ export const ordersRouter = router({
         }
       };
       const originalImageUrl = await signImage(order.originalImageKey, "original");
-      const generatedImageUrl = refreshUrl(order.generatedImageKey, order.generatedImageUrl);
+      const generatedImageUrl = await privateMediaUrl(order.generatedImageKey, order.generatedImageUrl);
       const previewImageUrl = await signImage(order.previewImageKey, "preview");
-      const videoUrl = refreshUrl(order.videoKey, order.videoUrl);
+      const videoUrl = await privateMediaUrl(order.videoKey, order.videoUrl);
+      const voiceSampleUrl = await privateMediaUrl(order.voiceSampleKey, order.voiceSampleUrl);
       const previewError = order.errorMessage?.startsWith("Preview: ")
         ? order.errorMessage.slice("Preview: ".length)
         : null;
@@ -329,6 +294,9 @@ export const ordersRouter = router({
         generatedImageUrl,
         previewImageUrl,
         videoUrl,
+        voiceSampleUrl,
+        generatedImageAccessError: order.generatedImageKey && !generatedImageUrl ? "This image is temporarily unavailable. Please refresh to try again." : null,
+        videoAccessError: order.videoKey && !videoUrl ? "This video is temporarily unavailable. Please refresh to try again." : null,
         originalImageAccessError,
         previewImageAccessError,
         previewError,
@@ -368,7 +336,7 @@ export const ordersRouter = router({
    * Get all orders for the current user (auth required)
    */
   getUserOrders: protectedProcedure.query(async ({ ctx }) => {
-    return getUserOrders(ctx.user.id);
+    return Promise.all((await getUserOrders(ctx.user.id)).map(signOrderListMedia));
   }),
 
   /**
@@ -519,6 +487,7 @@ export const ordersRouter = router({
         const metadata: Record<string, string> = {
           order_id: input.orderId.toString(),
           child_name: order.childName || "",
+        app_scope: getPaymentScope(),
         };
 
         if (ctx.user) {
@@ -561,6 +530,7 @@ export const ordersRouter = router({
           mode: "payment",
           client_reference_id: ctx.user?.id?.toString() || `guest-${order.id}`,
           metadata,
+          payment_intent_data: { metadata },
           line_items: [
             {
               price_data: {
@@ -635,7 +605,7 @@ export const ordersRouter = router({
         return true;
       });
 
-      return scenes;
+      return Promise.all(scenes.map(signSceneMedia));
     }),
 
   /**
@@ -660,6 +630,14 @@ export const ordersRouter = router({
         });
       }
 
+      if (!order.storyApproved) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Please approve the story before video generation." });
+      }
+      if (!(order.generatedImageKey || order.generatedImageUrl)) {
+        await scheduleImageGeneration(input.orderId);
+        return { success: true, message: "Character generation has been queued." };
+      }
+
       // Clear any previous error message when retrying
       const db = await getDb();
       if (db && order.errorMessage) {
@@ -668,7 +646,7 @@ export const ordersRouter = router({
           .where(eq(orders.id, input.orderId));
       }
 
-      scheduleVideoGeneration(input.orderId);
+      scheduleVideoGeneration(input.orderId, { retryMissingScenes: true });
 
       return { success: true, message: "Video generation started" };
     }),
@@ -769,6 +747,9 @@ export const ordersRouter = router({
       }
 
       const order = result[0];
+      if (order.paymentStatus !== "paid") {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Storybook not found or link has been revoked" });
+      }
 
       // Get the scenes for this order
       const scenes = await db
@@ -782,16 +763,16 @@ export const ordersRouter = router({
         childName: order.childName,
         story: order.story,
         storyTheme: order.storyTheme,
-        generatedImageUrl: order.generatedImageUrl,
-        hasVideo: !!order.videoUrl,
+        generatedImageUrl: await privateMediaUrl(order.generatedImageKey, order.generatedImageUrl),
+        hasVideo: !!(order.videoKey || order.videoUrl),
         videoKey: order.videoKey || null, // needed for download URL generation
-        scenes: scenes.map(s => ({
+        scenes: await Promise.all(scenes.map(async s => ({
           sceneIndex: s.sceneIndex,
           sceneText: s.sceneText,
-          illustrationUrl: s.illustrationUrl,
-          narrationUrl: s.narrationUrl,
+          illustrationUrl: await privateMediaUrl(s.illustrationKey, s.illustrationUrl),
+          narrationUrl: await privateMediaUrl(s.narrationKey, s.narrationUrl),
           status: s.status,
-        })),
+        }))),
       };
     }),
 
@@ -806,7 +787,7 @@ export const ordersRouter = router({
     )
     .query(async ({ input }) => {
       if (input.guestTokens.length === 0) return [];
-      return getOrdersByGuestTokens(input.guestTokens);
+      return Promise.all((await getOrdersByGuestTokens(input.guestTokens)).map(signOrderListMedia));
     }),
 
   /**
@@ -935,14 +916,14 @@ export const ordersRouter = router({
     const allOrders = await getAllOrders();
     // Derive videoGenerating from DB status — do NOT use in-memory isVideoGenerating()
     // because Cloud Run routes requests to different instances with empty in-memory Sets.
-    return allOrders.map(order => ({
-      ...order,
+    return Promise.all(allOrders.map(async order => ({
+      ...await signOrderListMedia(order),
       videoGenerating:
         order.paymentStatus === "paid" &&
         order.status === "processing" &&
         !order.videoUrl &&
         !order.videoKey,
-    }));
+    })));
   }),
 
   /**
@@ -1044,6 +1025,10 @@ export const ordersRouter = router({
         input.guestToken
       );
 
+      if (order.paymentStatus === "refunded") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "This order has been refunded." });
+      }
+
       // If already paid, nothing to do
       if (order.paymentStatus === "paid") {
         return { success: true, alreadyPaid: true };
@@ -1055,6 +1040,10 @@ export const ordersRouter = router({
 
       if (session.payment_status !== "paid") {
         return { success: false, alreadyPaid: false, status: session.payment_status };
+      }
+
+      if (!isStripeContextValid(session.livemode, session.metadata)) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Payment session belongs to a different environment." });
       }
 
       // Verify the session belongs to this order
@@ -1074,9 +1063,8 @@ export const ordersRouter = router({
 
       console.log(`[VerifySession] Marked order ${input.orderId} as paid via session verification`);
 
-      // Trigger image generation (same as webhook)
-      const { scheduleImageGeneration } = await import("../jobs/imageGenerationJob");
-      scheduleImageGeneration(input.orderId);
+      // The guarded worker prevents webhook/browser-return races from regenerating assets.
+      await scheduleImageGeneration(input.orderId);
 
       return { success: true, alreadyPaid: false };
     }),
@@ -1136,36 +1124,11 @@ export const ordersRouter = router({
         throw new TRPCError({ code: "NOT_FOUND", message: "Video not ready yet" });
       }
 
-      const region = process.env.S3_REGION;
-      const accessKeyId = process.env.AWS_ACCESS_KEY_ID;
-      const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY;
-      const bucket = process.env.S3_BUCKET;
-
-      if (!region || !accessKeyId || !secretAccessKey || !bucket) {
-        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Storage not configured" });
+      if (order.paymentStatus !== "paid") {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Storybook not found" });
       }
-
-      const childName = order.childName || "storybook";
-      const filename = `${childName.replace(/[^a-z0-9]/gi, "-").toLowerCase()}-animated-story.mp4`;
-      const key = order.videoKey.replace(/^\/+/, "");
-
-      const client = new S3Client({
-        region,
-        credentials: { accessKeyId, secretAccessKey },
-      });
-
-      const downloadUrl = await getSignedUrl(
-        client,
-        new GetObjectCommand({
-          Bucket: bucket,
-          Key: key,
-          ResponseContentDisposition: `attachment; filename="${filename}"`,
-          ResponseContentType: "video/mp4",
-        }),
-        { expiresIn: 300 }
-      );
-
-      return { downloadUrl, filename };
+      const childName = (order.childName || "storybook").replace(/[^a-z0-9]/gi, "-").toLowerCase();
+      return privateDownloadUrl(order.videoKey, `${childName}-animated-story.mp4`, "video/mp4");
     }),
 
   /**
@@ -1186,35 +1149,17 @@ export const ordersRouter = router({
         throw new TRPCError({ code: "NOT_FOUND", message: "Video not ready yet" });
       }
 
-      const region = process.env.S3_REGION;
-      const accessKeyId = process.env.AWS_ACCESS_KEY_ID;
-      const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY;
-      const bucket = process.env.S3_BUCKET;
-
-      if (!region || !accessKeyId || !secretAccessKey || !bucket) {
-        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Storage not configured" });
+      const childName = (order.childName || "storybook").replace(/[^a-z0-9]/gi, "-").toLowerCase();
+      return privateDownloadUrl(order.videoKey, `${childName}-animated-story.mp4`, "video/mp4");
+    }),
+  getCharacterDownloadUrl: publicProcedure
+    .input(z.object({ orderId: z.number().int().positive(), guestToken: z.string().optional() }))
+    .mutation(async ({ ctx, input }) => {
+      const order = await verifyOrderAccess(input.orderId, ctx.user?.id, input.guestToken);
+      if (!order.generatedImageKey) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Character image not ready yet" });
       }
-
-      const childName = order.childName || "storybook";
-      const filename = `${childName.replace(/[^a-z0-9]/gi, "-").toLowerCase()}-animated-story.mp4`;
-      const key = order.videoKey.replace(/^\/+/, "");
-
-      const client = new S3Client({
-        region,
-        credentials: { accessKeyId, secretAccessKey },
-      });
-
-      const downloadUrl = await getSignedUrl(
-        client,
-        new GetObjectCommand({
-          Bucket: bucket,
-          Key: key,
-          ResponseContentDisposition: `attachment; filename="${filename}"`,
-          ResponseContentType: "video/mp4",
-        }),
-        { expiresIn: 300 } // 5-minute link — enough time to start the download
-      );
-
-      return { downloadUrl, filename };
+      const childName = (order.childName || "character").replace(/[^a-z0-9]/gi, "-").toLowerCase();
+      return privateDownloadUrl(order.generatedImageKey, `${childName}-animated-character.png`, "image/png");
     }),
 });

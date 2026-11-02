@@ -3,6 +3,7 @@ import { promisify } from "util";
 import * as fs from "fs/promises";
 import * as path from "path";
 import * as os from "os";
+import { storageReadBytes } from "../storage";
 
 const execAsync = promisify(exec);
 
@@ -21,14 +22,19 @@ const THEME_BGM: Record<string, string> = {
   enchantedForest: "https://d2xsxph8kpxj0f.cloudfront.net/310519663488009170/4GL2mPjHtW2yMjS2aSQkPm/bgm-enchantedForest_35681286.mp3",
 };
 
-interface SceneAsset {
+export interface SceneAsset {
   sceneIndex: number;
-  illustrationUrl: string;
-  narrationUrl: string | null;
+  /** A canonical permanent object key, preferred over the legacy URL. */
+  illustrationKey?: string | null;
+  illustrationUrl?: string | null;
+  /** A canonical permanent object key, preferred over the legacy URL. */
+  narrationKey?: string | null;
+  narrationUrl?: string | null;
 }
 
 /**
- * Download a file from a URL to a local path.
+ * Download a file from a URL to a local path. This is retained for legacy
+ * URL-only scene records and externally hosted BGM tracks.
  */
 async function downloadToFile(url: string, destPath: string): Promise<void> {
   const response = await fetch(url);
@@ -37,6 +43,31 @@ async function downloadToFile(url: string, destPath: string): Promise<void> {
   }
   const buffer = Buffer.from(await response.arrayBuffer());
   await fs.writeFile(destPath, buffer);
+}
+
+/**
+ * Materialize a stored paid asset. A supplied key is authoritative: if the SDK
+ * read fails, the URL is deliberately not tried as a fallback. URL fetches are
+ * allowed only for pre-migration URL-only records.
+ */
+async function materializeSceneAsset(
+  key: string | null | undefined,
+  legacyUrl: string | null | undefined,
+  destPath: string,
+  label: string
+): Promise<void> {
+  if (key) {
+    const stored = await storageReadBytes(key);
+    await fs.writeFile(destPath, stored.data);
+    return;
+  }
+
+  if (legacyUrl) {
+    await downloadToFile(legacyUrl, destPath);
+    return;
+  }
+
+  throw new Error(`Scene ${label} has neither a canonical key nor a legacy URL`);
 }
 
 /**
@@ -84,14 +115,24 @@ export async function composeStorybookVideo(
 
     for (const scene of sortedScenes) {
       const imgPath = path.join(tmpDir, `scene_${scene.sceneIndex}.png`);
-      await downloadToFile(scene.illustrationUrl, imgPath);
+      await materializeSceneAsset(
+        scene.illustrationKey,
+        scene.illustrationUrl,
+        imgPath,
+        `illustration ${scene.sceneIndex}`
+      );
 
       let audioPath: string | null = null;
       let duration = 6; // Default duration if no audio
 
-      if (scene.narrationUrl) {
+      if (scene.narrationKey || scene.narrationUrl) {
         audioPath = path.join(tmpDir, `narration_${scene.sceneIndex}.mp3`);
-        await downloadToFile(scene.narrationUrl, audioPath);
+        await materializeSceneAsset(
+          scene.narrationKey,
+          scene.narrationUrl,
+          audioPath,
+          `narration ${scene.sceneIndex}`
+        );
         duration = await getAudioDuration(audioPath);
         // Add a small buffer for pacing (1.5 seconds pause between scenes)
         duration = duration + 1.5;
@@ -158,6 +199,8 @@ export async function composeStorybookVideo(
     const finalPath = path.join(tmpDir, "final_storybook.mp4");
 
     try {
+      // BGM remains an external CDN asset; unavailable BGM is intentionally a
+      // non-fatal condition handled by the existing no-music fallback below.
       await downloadToFile(bgmUrl, bgmPath);
 
       // Get total video duration to loop BGM

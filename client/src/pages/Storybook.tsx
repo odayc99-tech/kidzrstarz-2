@@ -150,16 +150,20 @@ export default function StorybookPage() {
     }
   };
 
+  const getCharacterDownloadUrl = trpc.orders.getCharacterDownloadUrl.useMutation();
   const handleDownloadCharacter = useCallback(async () => {
     if (!order?.generatedImageUrl) return;
     setDownloading("character");
-    const childName = order.childName || "character";
-    const safeName = childName.replace(/[^a-zA-Z0-9]/g, "_").toLowerCase();
-    const proxyUrl = `/api/download/${orderId}/character`;
-    await downloadFile(order.generatedImageUrl, `${safeName}_animated_character.png`, proxyUrl);
-    toast.success("Character image downloaded!");
-    setDownloading(null);
-  }, [order, orderId]);
+    try {
+      const { downloadUrl, filename } = await getCharacterDownloadUrl.mutateAsync({ orderId, guestToken: guestToken || undefined });
+      await downloadFile(downloadUrl, filename);
+      toast.success("Character image download started.");
+    } catch {
+      toast.error("Unable to download this image. Please refresh and try again.");
+    } finally {
+      setDownloading(null);
+    }
+  }, [order, orderId, guestToken, getCharacterDownloadUrl]);
 
   const getVideoDownloadUrl = trpc.orders.getVideoDownloadUrl.useMutation();
 

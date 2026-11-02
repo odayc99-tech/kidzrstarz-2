@@ -1,5 +1,5 @@
 import { EdgeTTS } from "edge-tts-universal";
-import { storagePut } from "../storage";
+import { storagePut, storageReadBytes } from "../storage";
 import { nanoid } from "nanoid";
 import axios from "axios";
 import { getStorageNamespace } from "./storageNamespace";
@@ -27,13 +27,25 @@ const DEFAULT_EDGE_VOICE = "en-US-AnaNeural";
 
 // ─── ElevenLabs Voice Cloning ───────────────────────────────────────────────
 
+function extensionForVoiceMimeType(mimeType: string): string {
+  if (mimeType.includes("mpeg")) return "mp3";
+  if (mimeType.includes("wav")) return "wav";
+  if (mimeType.includes("ogg")) return "ogg";
+  if (mimeType.includes("mp4") || mimeType.includes("m4a")) return "m4a";
+  return "webm";
+}
+
 /**
  * Clone a voice using ElevenLabs Instant Voice Cloning.
- * Downloads the voice sample from S3, uploads it to ElevenLabs, and returns the cloned voice ID.
+ *
+ * A voiceSampleKey is authoritative: bytes and MIME are read through the S3
+ * SDK, and a read failure never falls back to an unsigned legacy URL. The URL
+ * path remains solely for historical URL-only records.
  */
 export async function cloneVoiceWithElevenLabs(
   voiceSampleUrl: string,
-  voiceName: string = "Custom Voice"
+  voiceName: string = "Custom Voice",
+  voiceSampleKey?: string
 ): Promise<string | null> {
   const apiKey = ELEVENLABS_API_KEY();
   if (!apiKey) {
@@ -44,13 +56,26 @@ export async function cloneVoiceWithElevenLabs(
   try {
     console.log(`[ElevenLabs] Starting voice cloning for "${voiceName}"...`);
 
-    // Step 1: Download the voice sample from S3
-    const sampleResponse = await axios.get(voiceSampleUrl, {
-      responseType: "arraybuffer",
-      timeout: 30000,
-    });
-    const sampleBuffer = Buffer.from(sampleResponse.data);
-    console.log(`[ElevenLabs] Downloaded voice sample (${sampleBuffer.length} bytes)`);
+    let sampleBuffer: Buffer;
+    let sampleMimeType: string;
+
+    if (voiceSampleKey) {
+      const storedSample = await storageReadBytes(voiceSampleKey);
+      sampleBuffer = storedSample.data;
+      sampleMimeType = storedSample.contentType || "audio/webm";
+    } else {
+      if (!voiceSampleUrl) {
+        throw new Error("Voice sample URL is required when no canonical storage key exists");
+      }
+      const sampleResponse = await axios.get(voiceSampleUrl, {
+        responseType: "arraybuffer",
+        timeout: 30000,
+      });
+      sampleBuffer = Buffer.from(sampleResponse.data);
+      sampleMimeType = String(sampleResponse.headers?.["content-type"] || "audio/webm");
+    }
+
+    console.log(`[ElevenLabs] Read voice sample (${sampleBuffer.length} bytes)`);
 
     // Step 2: Upload to ElevenLabs for instant voice cloning
     const FormData = (await import("form-data")).default;
@@ -58,8 +83,8 @@ export async function cloneVoiceWithElevenLabs(
     form.append("name", `KidzRstarz-${voiceName}-${nanoid(6)}`);
     form.append("description", `Cloned voice for children's storybook narration - ${voiceName}`);
     form.append("files", sampleBuffer, {
-      filename: "voice-sample.webm",
-      contentType: "audio/webm",
+      filename: `voice-sample.${extensionForVoiceMimeType(sampleMimeType)}`,
+      contentType: sampleMimeType,
     });
 
     const cloneResponse = await axios.post(

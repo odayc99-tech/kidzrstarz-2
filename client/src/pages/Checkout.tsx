@@ -103,7 +103,8 @@ export default function CheckoutPage() {
         if (data.paymentStatus === "paid" && data.status !== "completed" && data.status !== "failed") {
           return 5000;
         }
-        return false;
+        // Renew private links before expiry even after the order is complete.
+        return 240000;
       },
     }
   );
@@ -704,10 +705,15 @@ export default function CheckoutPage() {
                       Payment Complete!
                     </h3>
 
-                    {order.status === "completed" && order.generatedImageUrl ? (
+                    {order.generatedImageAccessError ? (
+                      <>
+                        <p className="text-red-700 mb-4">{order.generatedImageAccessError}</p>
+                        <Button variant="outline" onClick={() => refetch()}>Refresh media</Button>
+                      </>
+                    ) : order.generatedImageUrl ? (
                       <>
                         <p className="text-green-700 mb-4">
-                          Your animated character and storybook are ready!
+                          {order.videoKey ? "Your animated character and storybook are ready!" : "Your animated character is ready. Your storybook is being created."}
                         </p>
                         <Link href={`/storybook?orderId=${orderId}`}>
                           <Button className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700">

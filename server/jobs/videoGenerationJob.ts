@@ -1,17 +1,41 @@
 import { getOrderById } from "../db";
 import { getDb } from "../db";
 import { storyScenes, orders } from "../../drizzle/schema";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull, lt, or } from "drizzle-orm";
 import { splitStoryIntoScenes } from "../services/sceneSplitter";
 import { generateImage } from "../_core/imageGeneration";
 import { generateNarration, cloneVoiceWithElevenLabs } from "../services/ttsService";
 import { nanoid } from "nanoid";
-import { storagePut, storagePublicUrl } from "../storage";
+import { storagePut, storageReadBytes } from "../storage";
 import { applyBrandWatermark } from "../services/watermark";
 import { getStorageNamespace } from "../services/storageNamespace";
 import { notifyOwner } from "../_core/notification";
 import { composeStorybookVideo } from "../services/videoComposition";
 
+type CharacterReference = {
+  storageKey: string | null;
+  legacyUrl: string | null;
+};
+
+type SceneRow = {
+  id: number;
+  sceneIndex: number;
+  sceneText: string;
+  illustrationPrompt: string | null;
+  illustrationKey: string | null;
+  illustrationUrl: string | null;
+  narrationKey: string | null;
+  narrationUrl: string | null;
+  status: string;
+};
+
+type ProcessVideoGenerationOptions = {
+  /**
+   * A retry is an explicit operator action. Payment callbacks and ordinary
+   * scheduling must not silently recreate failed or missing paid scene assets.
+   */
+  retryMissingScenes?: boolean;
+};
 
 /**
  * Extract a detailed canonical character description from the generated animated character image.
@@ -76,6 +100,161 @@ Write it as a single dense paragraph. Do NOT include scene actions, expressions,
 }
 
 /**
+ * A stored key is authoritative. It is deliberately not paired with a fallback
+ * to the legacy URL: an access failure must not accidentally send a private
+ * customer asset through an unsigned URL path.
+ */
+async function characterReferenceForLLM(reference: CharacterReference): Promise<string> {
+  if (reference.storageKey) {
+    const stored = await storageReadBytes(reference.storageKey);
+    const mimeType = stored.contentType || "image/png";
+    return `data:${mimeType};base64,${stored.data.toString("base64")}`;
+  }
+
+  if (reference.legacyUrl) {
+    return reference.legacyUrl;
+  }
+
+  throw new Error("Order has no generated or original character image reference");
+}
+
+/**
+ * The paid generated image is preferred, followed by the source original. A
+ * legacy URL is retained only for pre-key records and is never used if either
+ * canonical key exists.
+ */
+function getCharacterReference(order: NonNullable<Awaited<ReturnType<typeof getOrderById>>>): CharacterReference {
+  if (order.generatedImageKey) {
+    return {
+      storageKey: order.generatedImageKey,
+      legacyUrl: order.generatedImageUrl,
+    };
+  }
+
+  if (order.originalImageKey) {
+    return {
+      storageKey: order.originalImageKey,
+      legacyUrl: order.originalImageUrl,
+    };
+  }
+
+  return {
+    storageKey: null,
+    legacyUrl: order.generatedImageUrl || order.originalImageUrl || null,
+  };
+}
+
+function hasRenderableIllustration(scene: Pick<SceneRow, "status" | "illustrationKey" | "illustrationUrl">): boolean {
+  return scene.status === "completed" && Boolean(scene.illustrationKey || scene.illustrationUrl);
+}
+
+function summarizeScenes(scenes: SceneRow[]) {
+  const byIndex = new Map<number, SceneRow[]>();
+  for (const scene of scenes) {
+    const group = byIndex.get(scene.sceneIndex) || [];
+    group.push(scene);
+    byIndex.set(scene.sceneIndex, group);
+  }
+
+  const completedByIndex = new Map<number, SceneRow>();
+  const missingSceneIndexes: number[] = [];
+
+  for (const [sceneIndex, group] of Array.from(byIndex.entries())) {
+    const completed = group
+      .filter(hasRenderableIllustration)
+      .sort((a: SceneRow, b: SceneRow) => b.id - a.id)[0];
+
+    if (completed) {
+      completedByIndex.set(sceneIndex, completed);
+    } else {
+      missingSceneIndexes.push(sceneIndex);
+    }
+  }
+
+  return {
+    completedScenes: Array.from(completedByIndex.values()).sort((a, b) => a.sceneIndex - b.sceneIndex),
+    missingSceneIndexes: missingSceneIndexes.sort((a, b) => a - b),
+    byIndex,
+  };
+}
+
+function chooseRetryScene(group: SceneRow[]): SceneRow {
+  // There is no complete illustration for this index. Prefer the newest
+  // incomplete row; a completed-but-corrupt row is retried only when it is the
+  // sole recoverable representation for the scene.
+  return [...group]
+    .filter((scene) => scene.status !== "completed")
+    .sort((a, b) => b.id - a.id)[0]
+    || [...group].sort((a, b) => b.id - a.id)[0];
+}
+
+function hasCanonicalVideo(order: NonNullable<Awaited<ReturnType<typeof getOrderById>>>): boolean {
+  // videoUrl may be an old public/expired URL. A paid workflow is complete only
+  // when a canonical permanent video key exists.
+  return Boolean(order.videoKey);
+}
+
+const VIDEO_CLAIM_STALE_MS = 30 * 60 * 1000;
+
+/**
+ * Claim paid video work across processes. The in-memory set below avoids local
+ * duplicates, while this compare-and-set prevents two Railway instances from
+ * producing voice, illustrations, or video for the same order at once.
+ */
+async function claimVideoGeneration(
+  db: NonNullable<Awaited<ReturnType<typeof getDb>>>,
+  order: NonNullable<Awaited<ReturnType<typeof getOrderById>>>
+): Promise<boolean> {
+  if (!order.generatedImageKey || order.videoKey) return false;
+
+  const staleBefore = new Date(Date.now() - VIDEO_CLAIM_STALE_MS);
+  const result = await db
+    .update(orders)
+    .set({ status: "processing" })
+    .where(and(
+      eq(orders.id, order.id),
+      eq(orders.paymentStatus, "paid"),
+      eq(orders.storyApproved, true),
+      eq(orders.generatedImageKey, order.generatedImageKey),
+      isNull(orders.videoKey),
+      or(
+        eq(orders.status, "completed"),
+        eq(orders.status, "pending"),
+        eq(orders.status, "failed"),
+        and(eq(orders.status, "processing"), lt(orders.updatedAt, staleBefore))
+      )
+    ));
+
+  // mysql2's ResultSetHeader exposes affectedRows. Do not assume success when
+  // it is missing: that would defeat the cross-instance lock.
+  const header = Array.isArray(result) ? result[0] : result;
+  return Number((header as { affectedRows?: unknown })?.affectedRows || 0) === 1;
+}
+
+async function renewVideoClaim(db: NonNullable<Awaited<ReturnType<typeof getDb>>>, orderId: number) {
+  // Scene progress must renew the existing updatedAt lease, not allow another
+  // instance to claim a legitimate long-running storybook render.
+  await db.update(orders).set({ status: "processing" }).where(and(
+    eq(orders.id, orderId), eq(orders.paymentStatus, "paid"),
+    eq(orders.storyApproved, true), eq(orders.status, "processing"), isNull(orders.videoKey)
+  ));
+}
+
+async function releaseVideoClaimAsFailed(
+  db: NonNullable<Awaited<ReturnType<typeof getDb>>>,
+  orderId: number
+): Promise<void> {
+  try {
+    await db
+      .update(orders)
+      .set({ status: "failed" })
+      .where(and(eq(orders.id, orderId), eq(orders.status, "processing")));
+  } catch (releaseError) {
+    console.error(`[VideoJob] Failed to release video claim for order ${orderId}:`, releaseError);
+  }
+}
+
+/**
  * Schedule video generation for an order.
  * This is triggered after payment is confirmed and the high-res image is generated.
  */
@@ -86,14 +265,18 @@ export function isVideoGenerating(orderId: number): boolean {
   return activeVideoJobs.has(orderId);
 }
 
-export function scheduleVideoGeneration(orderId: number) {
+/**
+ * Set retryMissingScenes only from an explicit admin/user retry action. Normal
+ * payment callbacks retain the default and will not regenerate paid scene work.
+ */
+export function scheduleVideoGeneration(orderId: number, options: ProcessVideoGenerationOptions = {}) {
   if (activeVideoJobs.has(orderId)) {
     console.log(`[VideoJob] Video generation already in progress for order ${orderId}, skipping duplicate`);
     return;
   }
   activeVideoJobs.add(orderId);
   setTimeout(() => {
-    processVideoGeneration(orderId)
+    processVideoGeneration(orderId, options)
       .catch(async (error) => {
         console.error(`[VideoJob] Failed for order ${orderId}:`, error);
         const errMsg = error instanceof Error ? error.message : String(error);
@@ -102,7 +285,7 @@ export function scheduleVideoGeneration(orderId: number) {
           const db = await getDb();
           if (db) {
             await db.update(orders)
-              .set({ errorMessage: `Video generation failed: ${errMsg.substring(0, 500)}` })
+              .set({ errorMessage: "Video: generation failed. Please try again." })
               .where(eq(orders.id, orderId));
             console.log(`[VideoJob] Stored error message on order ${orderId}`);
           }
@@ -126,6 +309,49 @@ export function scheduleVideoGeneration(orderId: number) {
   }, 2000);
 }
 
+async function cloneVoiceIfNeeded(
+  order: NonNullable<Awaited<ReturnType<typeof getOrderById>>>,
+  orderId: number,
+  db: NonNullable<Awaited<ReturnType<typeof getDb>>>
+): Promise<string | null> {
+  let elevenlabsVoiceId = order.elevenlabsVoiceId || null;
+  if ((order.voiceSampleKey || order.voiceSampleUrl) && !elevenlabsVoiceId) {
+    console.log(`[VideoJob] Voice sample found, cloning with ElevenLabs...`);
+    const clonedId = await cloneVoiceWithElevenLabs(
+      order.voiceSampleUrl || "",
+      order.childName || "Child",
+      order.voiceSampleKey || undefined
+    );
+
+    if (clonedId) {
+      elevenlabsVoiceId = clonedId;
+      // Save the cloned voice ID on the order for reuse
+      await db
+        .update(orders)
+        .set({ elevenlabsVoiceId: clonedId })
+        .where(eq(orders.id, orderId));
+      console.log(`[VideoJob] Voice cloned and saved: ${clonedId}`);
+    } else {
+      console.warn(`[VideoJob] Voice cloning failed, will use default ElevenLabs or Edge TTS`);
+    }
+  }
+
+  return elevenlabsVoiceId;
+}
+
+async function markCompletedIfNeeded(
+  db: NonNullable<Awaited<ReturnType<typeof getDb>>>,
+  order: NonNullable<Awaited<ReturnType<typeof getOrderById>>>,
+  orderId: number
+): Promise<void> {
+  if (order.status === "completed") return;
+
+  await db.update(orders)
+    .set({ status: "completed", completedAt: new Date() })
+    .where(eq(orders.id, orderId));
+  console.log(`[VideoJob] Order ${orderId} backfilled to completed status`);
+}
+
 /**
  * Main video generation pipeline:
  * 1. Clone voice with ElevenLabs if voice sample exists (done ONCE, cached on order)
@@ -135,7 +361,10 @@ export function scheduleVideoGeneration(orderId: number) {
  * 5. Generate TTS narration for each scene (using cloned voice or ElevenLabs default)
  * 6. Compose full video from all scenes
  */
-async function processVideoGeneration(orderId: number) {
+export async function processVideoGeneration(
+  orderId: number,
+  options: ProcessVideoGenerationOptions = {}
+): Promise<void> {
   console.log(`[VideoJob] Starting video generation for order ${orderId}`);
 
   const order = await getOrderById(orderId);
@@ -144,8 +373,37 @@ async function processVideoGeneration(orderId: number) {
     return;
   }
 
+  // These checks intentionally precede every provider/storage generation call.
+  // A browser callback or stale queue item must never create paid media before
+  // payment and story approval are both final.
+  if (order.paymentStatus !== "paid") {
+    console.warn(`[VideoJob] Order ${orderId} is not paid; skipping video generation`);
+    return;
+  }
+
+  if (!order.storyApproved) {
+    console.warn(`[VideoJob] Order ${orderId} story is not approved; skipping video generation`);
+    return;
+  }
+
   if (!order.story) {
     console.error(`[VideoJob] Order ${orderId} has no story`);
+    return;
+  }
+
+  // A finished canonical video is reusable. Do not claim or regenerate it.
+  if (hasCanonicalVideo(order)) {
+    const readyDb = await getDb();
+    if (readyDb) await markCompletedIfNeeded(readyDb, order, orderId);
+    console.log(`[VideoJob] Canonical video already exists for order ${orderId}, skipping generation`);
+    return;
+  }
+
+  // Paid video is based on the paid high-resolution character, not a URL-only
+  // preview. The compare-and-set below also requires this key.
+  const characterReference = getCharacterReference(order);
+  if (!order.generatedImageKey || !characterReference.storageKey) {
+    console.warn(`[VideoJob] Order ${orderId} has no canonical paid character image; skipping video generation`);
     return;
   }
 
@@ -155,99 +413,104 @@ async function processVideoGeneration(orderId: number) {
     return;
   }
 
+  const claimed = await claimVideoGeneration(db, order);
+  if (!claimed) {
+    console.log(`[VideoJob] Order ${orderId} has an active/fresh video claim or is no longer eligible, skipping duplicate`);
+    return;
+  }
+
   try {
-    // ─── Step 0: Clone voice if voice sample exists and not yet cloned ────
-    let elevenlabsVoiceId = order.elevenlabsVoiceId || null;
-
-    if (order.voiceSampleUrl && !elevenlabsVoiceId) {
-      console.log(`[VideoJob] Voice sample found, cloning with ElevenLabs...`);
-      const clonedId = await cloneVoiceWithElevenLabs(
-        order.voiceSampleUrl,
-        order.childName || "Child"
-      );
-
-      if (clonedId) {
-        elevenlabsVoiceId = clonedId;
-        // Save the cloned voice ID on the order for reuse
-        await db
-          .update(orders)
-          .set({ elevenlabsVoiceId: clonedId })
-          .where(eq(orders.id, orderId));
-        console.log(`[VideoJob] Voice cloned and saved: ${clonedId}`);
-      } else {
-        console.warn(`[VideoJob] Voice cloning failed, will use default ElevenLabs or Edge TTS`);
-      }
-    }
-
-    // ─── Check for existing scenes ────────────────────────────────────────
+    // ─── Check existing scenes before starting any provider work ────────────
     const existingScenes = await db
       .select()
       .from(storyScenes)
-      .where(eq(storyScenes.orderId, orderId));
+      .where(eq(storyScenes.orderId, orderId)) as SceneRow[];
 
     if (existingScenes.length > 0) {
-      console.log(`[VideoJob] Scenes already exist for order ${orderId}, checking for pending`);
-      const pendingScenes = existingScenes.filter((s) => s.status !== "completed");
-      if (pendingScenes.length === 0 && order.videoUrl) {
-        console.log(`[VideoJob] All scenes already completed and video exists for order ${orderId}`);
-        // Ensure order is marked as completed if it isn't already
-        if (order.status !== "completed") {
-          const db2 = await getDb();
-          if (db2) {
-            await db2.update(orders)
-              .set({ status: "completed", completedAt: new Date() })
-              .where(eq(orders.id, orderId));
-            console.log(`[VideoJob] Order ${orderId} backfilled to completed status`);
-          }
+      const sceneState = summarizeScenes(existingScenes);
+
+      if (sceneState.missingSceneIndexes.length === 0) {
+        if (hasCanonicalVideo(order)) {
+          console.log(`[VideoJob] All scenes and a canonical video key already exist for order ${orderId}`);
+          await markCompletedIfNeeded(db, order, orderId);
+          return;
         }
+
+        // Every scene is intact, but a legacy URL-only or missing video needs a
+        // new canonical-key composition. No image, LLM, or voice generation is
+        // necessary for this recovery path.
+        console.log(`[VideoJob] All scenes completed but no canonical video key exists; composing now...`);
+        await composeFullVideo(orderId, order.userId, order.storyTheme);
+        console.log(`[VideoJob] Video composition completed for order ${orderId}`);
         return;
       }
 
-      // Extract canonical description for pending scene processing
-      const characterImageUrl = order.generatedImageUrl || order.originalImageUrl;
-      let canonicalDescription = "";
-      if (characterImageUrl) {
-        canonicalDescription = await extractCharacterDescription(
-          characterImageUrl,
-          order.childName || "the child",
-          order.childDescription
+      if (!options.retryMissingScenes) {
+        console.warn(
+          `[VideoJob] Order ${orderId} has missing/failed scenes (${sceneState.missingSceneIndexes.join(", ")}); ` +
+          "leaving completed assets untouched until an explicit retry"
         );
+        await releaseVideoClaimAsFailed(db, orderId);
+        await db.update(orders).set({ errorMessage: "Video: Some scenes could not be completed. Please retry the missing scenes." }).where(and(eq(orders.id, orderId), eq(orders.status, "failed")));
+        return;
       }
 
-      // Process any pending scenes first
-      for (const scene of pendingScenes) {
+      // Explicit retry only: process a single missing representation for each
+      // missing scene index. Completed scene assets are never regenerated.
+      const elevenlabsVoiceId = await cloneVoiceIfNeeded(order, orderId, db);
+      const llmImageInput = await characterReferenceForLLM(characterReference);
+      const canonicalDescription = await extractCharacterDescription(
+        llmImageInput,
+        order.childName || "the child",
+        order.childDescription
+      );
+
+      for (const sceneIndex of sceneState.missingSceneIndexes) {
+        await renewVideoClaim(db, orderId);
+        const scene = chooseRetryScene(sceneState.byIndex.get(sceneIndex) || []);
+        if (!scene) continue;
         await processScene(
           scene.id,
           orderId,
           order.userId,
-          characterImageUrl,
+          characterReference,
           elevenlabsVoiceId,
-          canonicalDescription
+          canonicalDescription,
+          true
         );
       }
-      // If all scenes are done but no video was composed, compose it now
-      if (!order.videoUrl) {
-        console.log(`[VideoJob] All scenes completed but no video exists, composing now...`);
+
+      const refreshedScenes = await db
+        .select()
+        .from(storyScenes)
+        .where(eq(storyScenes.orderId, orderId)) as SceneRow[];
+      const refreshedState = summarizeScenes(refreshedScenes);
+      if (refreshedState.missingSceneIndexes.length > 0) {
+        throw new Error(
+          `Cannot compose storybook: scenes ${refreshedState.missingSceneIndexes.join(", ")} are incomplete or missing illustrations`
+        );
+      }
+
+      if (!hasCanonicalVideo(order)) {
         await composeFullVideo(orderId, order.userId, order.storyTheme);
-        console.log(`[VideoJob] Video composition completed for order ${orderId}`);
       }
       return;
     }
 
-    // ─── Step 0.5: Extract canonical character description from generated character image ──
-    const characterImageUrl = order.generatedImageUrl || order.originalImageUrl;
-    let canonicalDescription = "";
-    if (characterImageUrl) {
-      console.log(`[VideoJob] Extracting canonical character description...`);
-      canonicalDescription = await extractCharacterDescription(
-        characterImageUrl,
-        order.childName || "the child",
-        order.childDescription
-      );
-      console.log(`[VideoJob] Canonical description: ${canonicalDescription.substring(0, 100)}...`);
-    }
+    // ─── Step 0: Clone voice if voice sample exists and not yet cloned ──────
+    const elevenlabsVoiceId = await cloneVoiceIfNeeded(order, orderId, db);
 
-    // ─── Step 1: Split story into scenes (pass canonical description) ────
+    // ─── Step 0.5: Read the canonical character key for the LLM ────────────
+    const llmImageInput = await characterReferenceForLLM(characterReference);
+    console.log(`[VideoJob] Extracting canonical character description...`);
+    const canonicalDescription = await extractCharacterDescription(
+      llmImageInput,
+      order.childName || "the child",
+      order.childDescription
+    );
+    console.log(`[VideoJob] Canonical description: ${canonicalDescription.substring(0, 100)}...`);
+
+    // ─── Step 1: Split story into scenes (pass canonical description) ──────
     console.log(`[VideoJob] Splitting story into scenes...`);
     const scenes = await splitStoryIntoScenes(
       order.story,
@@ -267,33 +530,45 @@ async function processVideoGeneration(orderId: number) {
       });
     }
 
-    // ─── Step 3: Process each scene (generate image + audio) ──────────────
+    // ─── Step 3: Process each newly created scene ─────────────────────────
     const insertedScenes = await db
       .select()
       .from(storyScenes)
-      .where(eq(storyScenes.orderId, orderId));
+      .where(eq(storyScenes.orderId, orderId)) as SceneRow[];
 
     for (const scene of insertedScenes) {
+      await renewVideoClaim(db, orderId);
       await processScene(
         scene.id,
         orderId,
         order.userId,
-        characterImageUrl,
+        characterReference,
         elevenlabsVoiceId,
         canonicalDescription
       );
     }
 
+    const completedScenes = await db
+      .select()
+      .from(storyScenes)
+      .where(eq(storyScenes.orderId, orderId)) as SceneRow[];
+    const completedState = summarizeScenes(completedScenes);
+    if (completedState.missingSceneIndexes.length > 0) {
+      throw new Error(
+        `Cannot compose storybook: scenes ${completedState.missingSceneIndexes.join(", ")} are incomplete or missing illustrations`
+      );
+    }
+
     console.log(`[VideoJob] All scenes completed for order ${orderId}`);
 
-    // ─── Step 4: Compose full video from scenes ──────────────────────
-    // Let composition errors propagate so the outer catch stores errorMessage
-    // Scenes are still viewable in the player even if video composition fails
+    // ─── Step 4: Compose full video from scenes ────────────────────────────
+    // Let composition errors propagate so the outer catch stores errorMessage.
+    // Scenes are still viewable in the player even if video composition fails.
     await composeFullVideo(orderId, order.userId, order.storyTheme);
 
     console.log(`[VideoJob] Video generation completed for order ${orderId}`);
 
-    // ─── Send storybook ready email notification ──────────────────────
+    // ─── Send storybook ready email notification ───────────────────────────
     try {
       await sendStorybookReadyNotification(orderId, order);
     } catch (notifyError) {
@@ -301,7 +576,8 @@ async function processVideoGeneration(orderId: number) {
     }
   } catch (error) {
     console.error(`[VideoJob] Error processing order ${orderId}:`, error);
-    // Re-throw so scheduleVideoGeneration's outer catch stores errorMessage on the order
+    await releaseVideoClaimAsFailed(db, orderId);
+    // Re-throw so scheduleVideoGeneration's outer catch stores errorMessage.
     throw error;
   }
 }
@@ -312,68 +588,65 @@ async function processVideoGeneration(orderId: number) {
  */
 async function composeFullVideo(orderId: number, userId: number | null, storyTheme: string) {
   const db = await getDb();
-  if (!db) return;
+  if (!db) {
+    throw new Error("Database not available for video composition");
+  }
 
+  await renewVideoClaim(db, orderId);
   console.log(`[VideoJob] Starting full video composition for order ${orderId}`);
 
-  // Get all completed scenes
   const allScenes = await db
     .select()
     .from(storyScenes)
-    .where(eq(storyScenes.orderId, orderId));
+    .where(eq(storyScenes.orderId, orderId)) as SceneRow[];
+  const sceneState = summarizeScenes(allScenes);
 
-  // Deduplicate by sceneIndex (keep latest per index, i.e. highest id)
-  const sceneMap = new Map<number, typeof allScenes[0]>();
-  for (const s of allScenes) {
-    if (s.status === "completed" && s.illustrationUrl) {
-      const existing = sceneMap.get(s.sceneIndex);
-      if (!existing || s.id > existing.id) {
-        sceneMap.set(s.sceneIndex, s);
-      }
-    }
-  }
-  const completedScenes = Array.from(sceneMap.values())
-    .sort((a, b) => a.sceneIndex - b.sceneIndex);
-
-  if (completedScenes.length === 0) {
-    console.warn(`[VideoJob] No completed scenes for video composition`);
-    return;
+  // Never make a video from only the successful subset. A scene index without a
+  // completed illustration is a failed/missing paid scene, not a finished story.
+  if (sceneState.missingSceneIndexes.length > 0) {
+    throw new Error(
+      `Cannot compose storybook: scenes ${sceneState.missingSceneIndexes.join(", ")} are incomplete or missing illustrations`
+    );
   }
 
-  // Always reconstruct fresh public URLs from the S3 keys rather than using the
-  // stored illustrationUrl/narrationUrl, which may be expired pre-signed URLs
-  // (pre-signed URLs expire after 1 hour; public URLs never expire).
-  const sceneAssets = completedScenes.map((s) => ({
-    sceneIndex: s.sceneIndex,
-    illustrationUrl: s.illustrationKey
-      ? storagePublicUrl(s.illustrationKey)
-      : s.illustrationUrl!, // fallback to stored URL if no key (shouldn't happen)
-    narrationUrl: s.narrationKey
-      ? storagePublicUrl(s.narrationKey)
-      : (s.narrationUrl || null), // fallback to stored URL if no key
+  if (sceneState.completedScenes.length === 0) {
+    throw new Error("Cannot compose storybook: no completed scenes are available");
+  }
+
+  const sceneAssets = sceneState.completedScenes.map((scene) => ({
+    sceneIndex: scene.sceneIndex,
+    // The composer reads keys through the authenticated SDK. URL fields are
+    // retained only as metadata/fallback for legacy records that have no key.
+    illustrationKey: scene.illustrationKey,
+    illustrationUrl: scene.illustrationUrl,
+    narrationKey: scene.narrationKey,
+    narrationUrl: scene.narrationUrl,
   }));
 
-  // Compose the video
   const videoBuffer = await composeStorybookVideo(sceneAssets, storyTheme);
 
-  // Upload to S3
+  // Upload to S3 and persist the key returned by storage, never a locally
+  // assumed destination key.
   const ns = getStorageNamespace(userId, orderId);
-  const videoKey = `${ns}/videos/${nanoid()}-storybook.mp4`;
-  const { url: videoUrl } = await storagePut(videoKey, videoBuffer, "video/mp4");
+  const requestedVideoKey = `${ns}/videos/${nanoid()}-storybook.mp4`;
+  const uploadedVideo = await storagePut(requestedVideoKey, videoBuffer, "video/mp4");
+  if (!uploadedVideo.key) {
+    throw new Error("Video upload completed without a canonical storage key");
+  }
 
-  // Update order with video URL, mark as completed, and clear any previous error message
+  // Update order with video URL metadata, a permanent key, and completion state.
   await db
     .update(orders)
     .set({
-      videoKey,
-      videoUrl,
+      videoKey: uploadedVideo.key,
+      videoUrl: uploadedVideo.url,
       errorMessage: null,
       status: "completed",
       completedAt: new Date(),
     })
     .where(eq(orders.id, orderId));
 
-  console.log(`[VideoJob] Full video uploaded and order marked completed: ${videoUrl}`);
+  console.log(`[VideoJob] Full video uploaded and order marked completed: ${uploadedVideo.url}`);
 }
 
 /**
@@ -399,13 +672,22 @@ async function sendStorybookReadyNotification(
   }
 }
 
+async function readLegacyImageResult(url: string): Promise<Buffer> {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Failed to download generated scene image: ${response.status}`);
+  }
+  return Buffer.from(await response.arrayBuffer());
+}
+
 async function processScene(
   sceneId: number,
   orderId: number,
   userId: number | null,
-  characterImageUrl: string,
+  characterReference: CharacterReference,
   elevenlabsVoiceId?: string | null,
-  canonicalDescription?: string
+  canonicalDescription?: string,
+  retryMissingScene = false
 ) {
   const db = await getDb();
   if (!db) return;
@@ -413,13 +695,21 @@ async function processScene(
   const sceneRows = await db
     .select()
     .from(storyScenes)
-    .where(eq(storyScenes.id, sceneId));
+    .where(eq(storyScenes.id, sceneId)) as SceneRow[];
 
   const scene = sceneRows[0];
   if (!scene) return;
-  if (scene.status === "completed") return;
+  if (hasRenderableIllustration(scene)) return;
+
+  // Existing failed/generating records are retried only by an explicit caller.
+  if (scene.status !== "pending" && !retryMissingScene) {
+    console.warn(`[VideoJob] Scene ${scene.sceneIndex} is ${scene.status}; awaiting an explicit retry`);
+    return;
+  }
 
   try {
+    // Keep a successfully stored illustration during an explicit audio/restart retry.
+    if (!(scene.illustrationKey || scene.illustrationUrl)) {
     // ─── Generate illustration with character consistency ─────────────────
     console.log(`[VideoJob] Generating illustration for scene ${scene.sceneIndex}...`);
     await db
@@ -427,8 +717,8 @@ async function processScene(
       .set({ status: "generating_image" })
       .where(eq(storyScenes.id, sceneId));
 
-    // Build the full prompt: canonical character description FIRST, then scene-specific content
-    // The canonical description is the single source of truth for the character's appearance
+    // Build the full prompt: canonical character description FIRST, then scene-specific content.
+    // The canonical description is the single source of truth for the character's appearance.
     const characterBlock = canonicalDescription
       ? `EXACT CHARACTER TO USE IN THIS SCENE (do NOT change any detail):\n${canonicalDescription}\n\n`
       : "";
@@ -446,37 +736,74 @@ CRITICAL RULES:
 5. All content must be completely child-safe, wholesome, and appropriate for a children's picture book.
 6. WIDESCREEN COMPOSITION: Frame this as a wide 16:9 cinematic landscape — like a still from a premium animated movie. The character should be positioned within a wide horizontal frame with a rich, detailed background extending to both sides. Do NOT use a portrait or square crop.`,
       originalImages: [
-        {
-          url: characterImageUrl,
-          mimeType: "image/png",
-        },
+        characterReference.storageKey
+          ? {
+            storageKey: characterReference.storageKey,
+            mimeType: "image/png",
+          }
+          : {
+            // A legacy URL is allowed only when there was no canonical key.
+            url: characterReference.legacyUrl || undefined,
+            mimeType: "image/png",
+          },
       ],
     });
 
-    if (imageResult.url) {
-      // Download, watermark, and re-upload the scene illustration
-      let finalIllustrationUrl = imageResult.url;
+    if (!imageResult.key && !imageResult.url) {
+      throw new Error("Image generation returned neither a canonical key nor a legacy URL");
+    }
+
+    // A canonical provider result is read through the SDK before watermarking.
+    // If this read fails, do not fall back to imageResult.url.
+    const sourceImage = imageResult.key
+      ? await storageReadBytes(imageResult.key)
+      : { data: await readLegacyImageResult(imageResult.url!) };
+
+    let brandedBuffer: Buffer | null = null;
+    try {
+      brandedBuffer = await applyBrandWatermark(sourceImage.data);
+    } catch (watermarkError) {
+      // The source result has already been validated above. Retain its actual
+      // canonical key if watermarking itself fails; never write the unuploaded
+      // requested scene key.
+      if (imageResult.key) {
+        console.warn(`[VideoJob] Watermark failed for scene ${scene.sceneIndex}, retaining source image key:`, watermarkError);
+        await db
+          .update(storyScenes)
+          .set({
+            illustrationUrl: imageResult.url || null,
+            illustrationKey: imageResult.key,
+          })
+          .where(eq(storyScenes.id, sceneId));
+      } else {
+        console.warn(`[VideoJob] Watermark failed for legacy scene ${scene.sceneIndex}, retaining source URL:`, watermarkError);
+        await db
+          .update(storyScenes)
+          .set({
+            illustrationUrl: imageResult.url || null,
+            illustrationKey: null,
+          })
+          .where(eq(storyScenes.id, sceneId));
+      }
+    }
+
+    if (brandedBuffer) {
       const ns = getStorageNamespace(userId, orderId);
-      const sceneFileKey = `${ns}/scenes/${nanoid()}-scene-${scene.sceneIndex}.png`;
-      try {
-        const imgResponse = await fetch(imageResult.url);
-        if (imgResponse.ok) {
-          const imgBuffer = Buffer.from(await imgResponse.arrayBuffer());
-          const brandedBuffer = await applyBrandWatermark(imgBuffer);
-          const { url: s3Url } = await storagePut(sceneFileKey, brandedBuffer, "image/png");
-          finalIllustrationUrl = s3Url;
-        }
-      } catch (wmError) {
-        console.warn(`[VideoJob] Watermark failed for scene ${scene.sceneIndex}, using original:`, wmError);
+      const requestedSceneKey = `${ns}/scenes/${nanoid()}-scene-${scene.sceneIndex}.png`;
+      const uploadedScene = await storagePut(requestedSceneKey, brandedBuffer, "image/png");
+      if (!uploadedScene.key) {
+        throw new Error("Scene upload completed without a canonical storage key");
       }
 
       await db
         .update(storyScenes)
         .set({
-          illustrationUrl: finalIllustrationUrl,
-          illustrationKey: sceneFileKey,
+          illustrationUrl: uploadedScene.url,
+          illustrationKey: uploadedScene.key,
         })
         .where(eq(storyScenes.id, sceneId));
+    }
+
     }
 
     // ─── Generate TTS narration ──────────────────────────────────────────
@@ -485,6 +812,11 @@ CRITICAL RULES:
       .update(storyScenes)
       .set({ status: "generating_audio" })
       .where(eq(storyScenes.id, sceneId));
+
+    if (scene.narrationKey || scene.narrationUrl) {
+      await db.update(storyScenes).set({ status: "completed" }).where(eq(storyScenes.id, sceneId));
+      return;
+    }
 
     try {
       const audioResult = await generateNarration(scene.sceneText, userId, orderId, {
@@ -500,7 +832,7 @@ CRITICAL RULES:
         .where(eq(storyScenes.id, sceneId));
       console.log(`[VideoJob] Scene ${scene.sceneIndex} completed with narration`);
     } catch (ttsError) {
-      // TTS failed - mark scene as completed anyway (illustration is the key asset)
+      // TTS failed - mark scene as completed anyway (illustration is the key asset).
       console.warn(
         `[VideoJob] TTS failed for scene ${scene.sceneIndex}, marking as completed without audio:`,
         ttsError instanceof Error ? ttsError.message : ttsError
@@ -521,7 +853,7 @@ CRITICAL RULES:
       const errMsg = error instanceof Error ? error.message : String(error);
       await notifyOwner({
         title: `⚠️ KidzRstarz: Scene Generation Failed - Order #${orderId}`,
-        content: `Scene ${sceneId} (order #${orderId}) failed to generate.\n\nError: ${errMsg.substring(0, 400)}\n\nThe video generation will continue with remaining scenes, but this scene may be missing.`,
+        content: `Scene ${sceneId} (order #${orderId}) failed to generate.\n\nError: ${errMsg.substring(0, 400)}\n\nCompleted scene assets are preserved. An explicit retry can regenerate only the missing parts.`,
       });
     } catch (notifyErr) {
       console.warn(`[VideoJob] Failed to send scene failure notification:`, notifyErr);

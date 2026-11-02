@@ -270,14 +270,22 @@ export function StoryPlayer({
         advanceToNextScene();
       });
 
-      audio.play().catch(console.error);
+      let disposed = false;
+      const fallback = () => {
+        if (!disposed && !isMuted) browserTTS.speak(scene.sceneText, advanceToNextScene);
+      };
+      audio.addEventListener("error", fallback);
+      audio.play().catch(() => fallback());
       progressInterval.current = setInterval(() => {
         setAudioProgress(audio.currentTime);
       }, 100);
 
       return () => {
+        disposed = true;
+        audio.removeEventListener("error", fallback);
         audio.pause();
         audio.src = "";
+        browserTTS.stop();
         if (progressInterval.current) clearInterval(progressInterval.current);
       };
     } else {
@@ -312,7 +320,7 @@ export function StoryPlayer({
         if (progressInterval.current) clearInterval(progressInterval.current);
       };
     }
-  }, [currentScene, isPlaying, scene?.narrationUrl, scene?.sceneText, isMuted]);
+  }, [currentScene, scene?.id, isPlaying, !!scene?.narrationUrl, scene?.sceneText, isMuted]);
 
   // Update mute state
   useEffect(() => {
@@ -395,7 +403,7 @@ export function StoryPlayer({
         <div className="text-center text-white px-6 max-w-md">
           <Film className="w-12 h-12 mx-auto mb-4 text-purple-400" />
           <p className="text-lg font-medium">Animated Storybook</p>
-          {pendingCount > 0 || scenes.length > 0 ? (
+          {pendingCount > 0 ? (
             <>
               <div className="flex items-center justify-center gap-2 mt-3">
                 <Loader2 className="w-4 h-4 animate-spin text-purple-400" />
@@ -439,6 +447,12 @@ export function StoryPlayer({
                 </p>
               )}
             </>
+          ) : scenes.length > 0 ? (
+            <p role="alert" className="text-sm text-red-300 mt-3">
+              {failedCount > 0
+                ? "Scene generation encountered an error. Please check the order status before retrying."
+                : "Scene images are temporarily unavailable. Please refresh this page to renew access."}
+            </p>
           ) : (
             <p className="text-sm text-slate-400 mt-2">
               Your animated storybook will appear here after payment
