@@ -49,13 +49,24 @@ function releaseAudio(audio: HTMLAudioElement | null) {
   audio.load();
 }
 
-function safePreparationError(error: unknown) {
+export function safePreparationError(error: unknown) {
   const code = (error as { data?: { code?: string } } | null)?.data?.code;
   if (code === "UNAUTHORIZED" || code === "FORBIDDEN") {
     return "Your admin session could not be verified. Sign in again before preparing a sample.";
   }
   if (code === "CONFLICT" || code === "TOO_MANY_REQUESTS") {
     return "A sample may already be preparing. Wait a moment, then explicitly try again.";
+  }
+  const message = (error as { message?: unknown } | null)?.message;
+  const safeMessages = [
+    "Private narrator audition storage is unavailable. Please try again later.",
+    "The narrator audition audio could not be validated. No substitute audio was used.",
+    "This native narrator audition is unavailable. No substitute voice or model was used.",
+  ];
+  if (code === "PRECONDITION_FAILED" && typeof message === "string" && safeMessages.includes(message)) {
+    return message === safeMessages[0]
+      ? `${message} Use Check sample storage; it does not use voice credits.`
+      : message;
   }
   // Never expose provider responses, private storage details, or signed URLs.
   return "The sample could not be prepared. Check provider availability and try again when ready. No replacement voice or model was used.";
@@ -68,6 +79,7 @@ export default function AdminNarratorsPage() {
     enabled: isAdmin && !authLoading,
   });
   const auditionMutation = trpc.narrators.audition.useMutation();
+  const storageCheckMutation = trpc.narrators.checkStorage.useMutation();
   const catalog = auditionsQuery.data as AuditionCatalog | undefined;
 
   const [confirmCredits, setConfirmCredits] = useState(false);
@@ -80,6 +92,7 @@ export default function AdminNarratorsPage() {
   const [pendingId, setPendingId] = useState<NarratorAuditionId | null>(null);
   const [playingId, setPlayingId] = useState<NarratorAuditionId | null>(null);
   const pendingRef = useRef<NarratorAuditionId | null>(null);
+  const storagePendingRef = useRef(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioPresetRef = useRef<NarratorAuditionId | null>(null);
   const playbackVersion = useRef(0);
@@ -123,6 +136,20 @@ export default function AdminNarratorsPage() {
     setPlayingId(null);
   };
 
+  const checkStorage = async () => {
+    if (!isAdmin || authLoading || pendingRef.current || storagePendingRef.current) return;
+    storagePendingRef.current = true;
+    stopPlayback();
+    try {
+      // Only a fixed diagnostic lock is checked; no speech, voice-specific lock or customer object is written.
+      await storageCheckMutation.mutateAsync();
+    } catch {
+      // Display a fixed safe message below, never the raw transport error.
+    } finally {
+      storagePendingRef.current = false;
+    }
+  };
+
   const generateSample = async (presetId: NarratorAuditionId) => {
     if (
       !isAdmin ||
@@ -130,6 +157,7 @@ export default function AdminNarratorsPage() {
       !confirmCredits ||
       !catalog ||
       pendingRef.current ||
+      storagePendingRef.current ||
       !NARRATOR_AUDITION_PRESETS.some(preset => preset.id === presetId)
     )
       return;
@@ -345,6 +373,35 @@ export default function AdminNarratorsPage() {
 
             <Card className="border-purple-200">
               <CardHeader className="pb-3">
+                <CardTitle className="text-lg">Sample storage check</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <p className="text-sm text-slate-600">
+                  If samples fail, check storage first. This reads the sample cache and tests a tiny separate temporary lock.
+                  It does not generate speech, use voice credits, change permissions, or alter customer stories.
+                </p>
+                <Button variant="outline" disabled={Boolean(pendingId) || storageCheckMutation.isPending}
+                  onClick={() => void checkStorage()} aria-label="Check sample storage">
+                  {storageCheckMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                  {storageCheckMutation.isPending ? "Checking storage…" : "Check sample storage"}
+                </Button>
+                {storageCheckMutation.data && (
+                  <div role="status" className="rounded-xl border border-purple-100 bg-purple-50 p-3 text-sm text-slate-700 space-y-1">
+                    <p className="font-semibold">{storageCheckMutation.data.ok ? "Storage check passed" : "Storage check failed"}</p>
+                    <p>{storageCheckMutation.data.message}</p>
+                    <p>Step: <code>{storageCheckMutation.data.stage}</code> · Result: <code>{storageCheckMutation.data.reason}</code></p>
+                    <p>Voice API key configured: {storageCheckMutation.data.providerKeyConfigured ? "yes" : "no"}.</p>
+                    <p className="text-xs">No speech was requested. You can share this result without sharing keys.</p>
+                  </div>
+                )}
+                {storageCheckMutation.error && (
+                  <p role="alert" className="text-sm text-amber-900">The storage check could not finish. Refresh your admin session and try the storage check again. No speech was requested.</p>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="border-purple-200">
+              <CardHeader className="pb-3">
                 <CardTitle className="text-lg">
                   Confirm before preparing samples
                 </CardTitle>
@@ -414,6 +471,7 @@ export default function AdminNarratorsPage() {
                         disabled={
                           !confirmCredits ||
                           Boolean(pendingId) ||
+                          storageCheckMutation.isPending ||
                           auditionMutation.isPending
                         }
                         onClick={() => void generateSample(preset.id)}

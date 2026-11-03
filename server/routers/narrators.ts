@@ -9,6 +9,7 @@ import {
   NARRATOR_AUDITION_TEXT,
 } from "../../shared/narratorAuditions";
 import {
+  checkNarratorAuditionStorage,
   getNarratorAudition,
   NarratorAuditionError,
 } from "../services/narratorAuditions";
@@ -21,6 +22,17 @@ export const narratorsRouter = router({
     settings: NARRATOR_AUDITION_SETTINGS,
     retirementDate: DEFAULT_VOICE_RETIREMENT_DATE,
   })),
+
+  checkStorage: adminProcedure.mutation(async () => {
+    try {
+      return await checkNarratorAuditionStorage();
+    } catch {
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: "The sample storage check could not finish. No speech was requested.",
+      });
+    }
+  }),
 
   audition: adminProcedure
     .input(

@@ -25,6 +25,71 @@ const LEASE_MS = 5 * 60_000;
 const EXPIRY_GRACE_MS = 5_000;
 const inflight = new Map<string, Promise<NarratorAuditionResult>>();
 
+const STORAGE_ENV = [
+  "S3_BUCKET",
+  "S3_REGION",
+  "AWS_ACCESS_KEY_ID",
+  "AWS_SECRET_ACCESS_KEY",
+] as const;
+const STORAGE_CHECK_LEASE =
+  "kidzrstarz/narrator-auditions/v1/storage-check.lease.json";
+const SAFE_REASONS = [
+  "AccessDenied",
+  "InvalidAccessKeyId",
+  "SignatureDoesNotMatch",
+  "NoSuchBucket",
+  "PermanentRedirect",
+  "AuthorizationHeaderMalformed",
+  "PreconditionFailed",
+  "ConditionalRequestConflict",
+  "AbortError",
+  "TimeoutError",
+  "BUSY",
+  "INVALID_AUDIO",
+  "STORAGE",
+  "MissingConfiguration",
+  "UnexpectedStorageResponse",
+] as const;
+type SafeReason = (typeof SAFE_REASONS)[number];
+type StorageFailure = { reason: SafeReason; status?: number };
+// Retain only sanitized code/status, never a raw SDK error or its message/credentials.
+const storageFailures = new WeakMap<Error, StorageFailure>();
+const lastFailureLog = new Map<NarratorAuditionId, number>();
+
+function storageFailure(error: unknown): StorageFailure {
+  if (error instanceof Error) {
+    const saved = storageFailures.get(error);
+    if (saved) return saved;
+  }
+  const value = error as {
+    name?: unknown;
+    Code?: unknown;
+    code?: unknown;
+    $metadata?: { httpStatusCode?: unknown };
+  } | null;
+  const status = value?.$metadata?.httpStatusCode;
+  const reason = [value?.name, value?.Code, value?.code].find(candidate =>
+    SAFE_REASONS.includes(candidate as SafeReason)
+  ) as SafeReason | undefined;
+  return {
+    reason:
+      error instanceof StorageDeadlineError
+        ? "TimeoutError"
+        : (reason ??
+          (status === 412
+            ? "PreconditionFailed"
+            : status === 409
+              ? "ConditionalRequestConflict"
+              : "STORAGE")),
+    ...(typeof status === "number" &&
+    Number.isInteger(status) &&
+    status >= 100 &&
+    status <= 599
+      ? { status }
+      : {}),
+  };
+}
+
 type ErrorCode = "BUSY" | "UNAVAILABLE" | "INVALID_AUDIO" | "STORAGE";
 const messages: Record<ErrorCode, string> = {
   BUSY: "This narrator audition is already being prepared. Please try again shortly.",
@@ -38,9 +103,14 @@ const messages: Record<ErrorCode, string> = {
 
 /** Safe to expose to an administrator; never includes provider/S3 errors or credentials. */
 export class NarratorAuditionError extends Error {
-  constructor(readonly code: ErrorCode) {
+  constructor(
+    readonly code: ErrorCode,
+    internalFailure?: unknown
+  ) {
     super(messages[code]);
     this.name = "NarratorAuditionError";
+    if (internalFailure !== undefined)
+      storageFailures.set(this, storageFailure(internalFailure));
   }
 }
 
@@ -53,6 +123,10 @@ type Preset = (typeof NARRATOR_AUDITION_PRESETS)[number];
 type Lease = { version: 1; token: string; expiresAt: number };
 type OwnedLease = { value: Lease; etag: string };
 
+function missingConfig(): string[] {
+  return STORAGE_ENV.filter(name => !process.env[name]);
+}
+
 function config(): Config {
   const { S3_BUCKET, S3_REGION, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY } =
     process.env;
@@ -62,7 +136,9 @@ function config(): Config {
     !AWS_ACCESS_KEY_ID ||
     !AWS_SECRET_ACCESS_KEY
   ) {
-    throw new NarratorAuditionError("STORAGE");
+    throw new NarratorAuditionError("STORAGE", {
+      name: "MissingConfiguration",
+    });
   }
   return {
     bucket: S3_BUCKET,
@@ -72,6 +148,14 @@ function config(): Config {
       secretAccessKey: AWS_SECRET_ACCESS_KEY,
     },
   };
+}
+
+function storageClient(expected: Config): S3Client {
+  return new S3Client({
+    region: expected.region,
+    credentials: expected.credentials,
+    maxAttempts: 1,
+  });
 }
 
 function configIdentity(value: Config): string {
@@ -213,12 +297,19 @@ async function readBody(body: unknown, maxBytes: number): Promise<Buffer> {
   let length = 0;
   try {
     if (!stream || typeof stream[Symbol.asyncIterator] !== "function")
-      throw new NarratorAuditionError("STORAGE");
+      throw new NarratorAuditionError("STORAGE", {
+        name: "UnexpectedStorageResponse",
+      });
     for await (const chunk of stream) {
       if (!(chunk instanceof Uint8Array))
-        throw new NarratorAuditionError("STORAGE");
+        throw new NarratorAuditionError("STORAGE", {
+          name: "UnexpectedStorageResponse",
+        });
       length += chunk.length;
-      if (length > maxBytes) throw new NarratorAuditionError("STORAGE");
+      if (length > maxBytes)
+        throw new NarratorAuditionError("STORAGE", {
+          name: "UnexpectedStorageResponse",
+        });
       chunks.push(Buffer.from(chunk));
     }
     return Buffer.concat(chunks, length);
@@ -233,15 +324,20 @@ async function cached(
   expected: Config
 ): Promise<boolean> {
   checkConfig(expected);
+  const absent = Symbol();
   const stored = await client
     .send(new GetObjectCommand({ Bucket: expected.bucket, Key: key }), {
       abortSignal: AbortSignal.timeout(STORAGE_TIMEOUT_MS),
     })
     .catch(error => {
-      if (missing(error)) return undefined;
-      throw new NarratorAuditionError("STORAGE");
+      if (missing(error)) return absent;
+      throw new NarratorAuditionError("STORAGE", error);
     });
-  if (!stored) return false;
+  if (stored === absent) return false;
+  if (!stored || typeof stored !== "object")
+    throw new NarratorAuditionError("STORAGE", {
+      name: "UnexpectedStorageResponse",
+    });
   try {
     if (
       stored.ContentLength !== undefined &&
@@ -255,13 +351,15 @@ async function cached(
     return true;
   } catch (error) {
     if (error instanceof NarratorAuditionError) throw error;
-    throw new NarratorAuditionError("STORAGE");
+    throw new NarratorAuditionError("STORAGE", error);
   }
 }
 
 function etag(value: unknown): string {
   if (typeof value !== "string" || !value.trim() || value.length > 512)
-    throw new NarratorAuditionError("STORAGE");
+    throw new NarratorAuditionError("STORAGE", {
+      name: "UnexpectedStorageResponse",
+    });
   return value;
 }
 
@@ -277,15 +375,25 @@ async function readLease(
     }
   );
   if (
+    !result ||
     !result.Body ||
     (result.ContentLength !== undefined &&
       (result.ContentLength < 1 || result.ContentLength > MAX_LEASE_BYTES))
   ) {
-    (result.Body as { destroy?: () => void } | undefined)?.destroy?.();
-    throw new NarratorAuditionError("STORAGE");
+    (result?.Body as { destroy?: () => void } | undefined)?.destroy?.();
+    throw new NarratorAuditionError("STORAGE", {
+      name: "UnexpectedStorageResponse",
+    });
   }
   const bytes = await deadline(readBody(result.Body, MAX_LEASE_BYTES));
-  const value = JSON.parse(bytes.toString("utf8")) as Lease;
+  let value: Lease;
+  try {
+    value = JSON.parse(bytes.toString("utf8")) as Lease;
+  } catch {
+    throw new NarratorAuditionError("STORAGE", {
+      name: "UnexpectedStorageResponse",
+    });
+  }
   if (
     !value ||
     value.version !== 1 ||
@@ -294,7 +402,9 @@ async function readLease(
     !Number.isSafeInteger(value.expiresAt) ||
     value.expiresAt < 0
   ) {
-    throw new NarratorAuditionError("STORAGE");
+    throw new NarratorAuditionError("STORAGE", {
+      name: "UnexpectedStorageResponse",
+    });
   }
   return { value, etag: etag(result.ETag) };
 }
@@ -317,7 +427,7 @@ async function putLease(
     }),
     { abortSignal: AbortSignal.timeout(STORAGE_TIMEOUT_MS) }
   );
-  return etag(result.ETag);
+  return etag(result?.ETag);
 }
 
 async function acquire(
@@ -385,6 +495,139 @@ async function assertOwned(
   }
 }
 
+type CheckStage =
+  | "config"
+  | "cache-read"
+  | "acquire"
+  | "lease-verify"
+  | "release"
+  | "complete";
+type StorageCheck = {
+  ok: boolean;
+  stage: string;
+  reason: string;
+  message: string;
+  providerKeyConfigured: boolean;
+};
+const checkActions: Record<SafeReason, string> = {
+  AccessDenied:
+    "Verify effective S3 permissions and explicit denies. Cache reads need GetObject; a missing object may need ListBucket to report absence; the diagnostic lease needs GetObject and conditional PutObject.",
+  InvalidAccessKeyId:
+    "Verify AWS_ACCESS_KEY_ID is active and matches AWS_SECRET_ACCESS_KEY.",
+  SignatureDoesNotMatch:
+    "Verify the AWS credential pair and server clock without sharing credential values.",
+  NoSuchBucket: "Verify S3_BUCKET identifies the existing bucket.",
+  PermanentRedirect: "Verify S3_REGION matches the bucket region.",
+  AuthorizationHeaderMalformed:
+    "Verify S3_REGION and the configured AWS credential pair.",
+  PreconditionFailed:
+    "The diagnostic lease changed concurrently. Retry after the current check finishes.",
+  ConditionalRequestConflict:
+    "The diagnostic lease changed concurrently. Retry after the current check finishes.",
+  AbortError:
+    "The bounded S3 operation was aborted. Check connectivity and retry.",
+  TimeoutError:
+    "The bounded S3 operation timed out. Check connectivity and retry.",
+  BUSY: "The diagnostic lease is busy or ownership changed. Wait for expiry before retrying.",
+  INVALID_AUDIO:
+    "The fixed audition cache is invalid. Investigate it before attempting paid generation; this check does not repair audio.",
+  STORAGE:
+    "Verify the existing S3 configuration, effective permissions, and connectivity.",
+  MissingConfiguration:
+    "Set the required S3 environment variables on the server.",
+  UnexpectedStorageResponse:
+    "S3 returned an invalid or incomplete bounded object/lease response. Investigate before retrying; no unconditional repair was attempted.",
+};
+
+/** Explicit, bounded storage-only diagnostic. Never signs audio or calls the provider. */
+export async function checkNarratorAuditionStorage(): Promise<StorageCheck> {
+  const providerKeyConfigured = Boolean(process.env.ELEVENLABS_API_KEY);
+  let stage: CheckStage = "config";
+  let client: S3Client | undefined;
+  let expected: Config | undefined;
+  let owned: OwnedLease | undefined;
+  let outcome: StorageCheck | undefined;
+  const failed = (phase: CheckStage, error: unknown): StorageCheck => {
+    const reason = storageFailure(error).reason;
+    const absent = reason === "MissingConfiguration" ? missingConfig() : [];
+    return {
+      ok: false,
+      stage: phase,
+      reason,
+      providerKeyConfigured,
+      message: absent.length
+        ? `Missing S3 configuration: ${absent.join(", ")}.`
+        : `Storage check failed during ${phase}. ${checkActions[reason]}`,
+    };
+  };
+  try {
+    expected = config();
+    client = storageClient(expected);
+    stage = "cache-read";
+    // Actual first Jade recipe only. Explicit absence is fine; denial/corruption stops before writes.
+    await cached(client, objectKey(NARRATOR_AUDITION_PRESETS[0]), expected);
+    stage = "acquire";
+    checkConfig(expected);
+    owned = await acquire(client, expected.bucket, STORAGE_CHECK_LEASE);
+    stage = "lease-verify";
+    checkConfig(expected);
+    await assertOwned(
+      client,
+      expected.bucket,
+      STORAGE_CHECK_LEASE,
+      owned,
+      STORAGE_TIMEOUT_MS
+    );
+  } catch (error) {
+    outcome = failed(stage, error);
+  } finally {
+    try {
+      if (client && expected && owned) {
+        try {
+          checkConfig(expected);
+          await putLease(
+            client,
+            expected.bucket,
+            STORAGE_CHECK_LEASE,
+            { ...owned.value, expiresAt: 0 },
+            { IfMatch: owned.etag }
+          );
+        } catch (error) {
+          // Preserve the primary phase failure, but never report success if release failed.
+          outcome ??= failed("release", error);
+        }
+      }
+    } finally {
+      client?.destroy();
+    }
+  }
+  return (
+    outcome ?? {
+      ok: true,
+      stage: "complete",
+      reason: "STORAGE",
+      providerKeyConfigured,
+      message:
+        "Storage cache read, diagnostic lease acquisition, ownership verification, and conditional release succeeded. No provider request was made.",
+    }
+  );
+}
+
+function logFailure(
+  preset: Preset,
+  stage: string,
+  error: NarratorAuditionError
+): void {
+  const now = Date.now();
+  const last = lastFailureLog.get(preset.id);
+  // At most one safe line per fixed preset per minute, never logs in polling/S3 helpers.
+  if (last !== undefined && now - last < 60_000) return;
+  lastFailureLog.set(preset.id, now);
+  console.warn(
+    `[NarratorAudition] ${preset.id} ${error.code} stage=${stage} reason=${storageFailure(error).reason}`
+  );
+}
+
 async function generate(preset: Preset): Promise<Buffer> {
   const apiKey = process.env.ELEVENLABS_API_KEY;
   if (!apiKey) throw new NarratorAuditionError("UNAVAILABLE");
@@ -429,6 +672,7 @@ async function run(
     fromCache: boolean
   ): Promise<NarratorAuditionResult> => {
     checkConfig(expected);
+    stage = "sign";
     const signed = await deadline(storageGetSignedUrl(key, 600));
     return {
       id: preset.id,
@@ -442,16 +686,16 @@ async function run(
   let client: S3Client | undefined;
   let owned: OwnedLease | undefined;
   let failure: unknown;
+  let stage = "cache-read";
   const leaseKey = `${key}.lease.json`;
   try {
-    client = new S3Client({
-      region: expected.region,
-      credentials: expected.credentials,
-      maxAttempts: 1,
-    });
+    client = storageClient(expected);
     if (await cached(client, key, expected)) return await result(true);
+    stage = "acquire";
     owned = await acquire(client, expected.bucket, leaseKey);
+    stage = "cache-read";
     if (await cached(client, key, expected)) return await result(true);
+    stage = "lease-verify";
     await assertOwned(
       client,
       expected.bucket,
@@ -460,7 +704,9 @@ async function run(
       PROVIDER_TIMEOUT_MS + 2 * STORAGE_TIMEOUT_MS
     );
     checkConfig(expected);
+    stage = "provider";
     const audio = await generate(preset);
+    stage = "lease-verify";
     await assertOwned(
       client,
       expected.bucket,
@@ -469,6 +715,7 @@ async function run(
       2 * STORAGE_TIMEOUT_MS
     );
     checkConfig(expected);
+    stage = "upload";
     try {
       // No ACL/public URL, retries, or late unbounded upload. Never overwrite an immutable cache.
       await client.send(
@@ -488,14 +735,18 @@ async function run(
       throw error;
     }
     // Verify persisted bytes before signing; an upload success alone is not a reusable cache.
+    stage = "cache-read";
     if (!(await cached(client, key, expected)))
       throw new NarratorAuditionError("STORAGE");
     return await result(false);
   } catch (error) {
     failure = error;
-    throw error instanceof NarratorAuditionError
-      ? error
-      : new NarratorAuditionError("STORAGE");
+    const safe =
+      error instanceof NarratorAuditionError
+        ? error
+        : new NarratorAuditionError("STORAGE", error);
+    logFailure(preset, stage, safe);
+    throw safe;
   } finally {
     try {
       if (client && owned) {
@@ -509,8 +760,11 @@ async function run(
             { IfMatch: owned.etag }
           );
         } catch (error) {
-          if (!conflict(error) && !failure)
-            throw new NarratorAuditionError("STORAGE");
+          if (!conflict(error) && !failure) {
+            const safe = new NarratorAuditionError("STORAGE", error);
+            logFailure(preset, "release", safe);
+            throw safe;
+          }
         }
       }
     } finally {
@@ -525,10 +779,10 @@ async function run(
 export function getNarratorAudition(
   id: NarratorAuditionId
 ): Promise<NarratorAuditionResult> {
+  const preset = NARRATOR_AUDITION_PRESETS.find(
+    candidate => candidate.id === id
+  );
   try {
-    const preset = NARRATOR_AUDITION_PRESETS.find(
-      candidate => candidate.id === id
-    );
     if (!preset) throw new NarratorAuditionError("UNAVAILABLE");
     const expected = config();
     const key = objectKey(preset);
@@ -541,10 +795,11 @@ export function getNarratorAudition(
     inflight.set(identity, pending);
     return pending;
   } catch (error) {
-    return Promise.reject(
+    const safe =
       error instanceof NarratorAuditionError
         ? error
-        : new NarratorAuditionError("STORAGE")
-    );
+        : new NarratorAuditionError("STORAGE", error);
+    if (preset) logFailure(preset, "config", safe);
+    return Promise.reject(safe);
   }
 }

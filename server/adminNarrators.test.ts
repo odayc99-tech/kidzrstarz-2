@@ -18,6 +18,9 @@ const mocks = vi.hoisted(() => ({
   query: vi.fn(),
   refetch: vi.fn(),
   audition: vi.fn(),
+  storageCheck: vi.fn(),
+  storageResult: undefined as any,
+  storageError: null as any,
   buttons: [] as any[],
 }));
 
@@ -38,6 +41,9 @@ vi.mock("@/lib/trpc", () => ({
       },
       audition: {
         useMutation: () => ({ mutateAsync: mocks.audition, isPending: false }),
+      },
+      checkStorage: {
+        useMutation: () => ({ mutateAsync: mocks.storageCheck, isPending: false, data: mocks.storageResult, error: mocks.storageError }),
       },
     },
   },
@@ -66,7 +72,7 @@ vi.mock("@/components/ui/card", () => ({
   CardTitle: (props: any) => React.createElement("h3", {}, props.children),
 }));
 
-import AdminNarrators from "../client/src/pages/AdminNarrators";
+import AdminNarrators, { safePreparationError } from "../client/src/pages/AdminNarrators";
 
 const source = readFileSync(
   new URL("../client/src/pages/AdminNarrators.tsx", import.meta.url),
@@ -117,6 +123,9 @@ beforeEach(() => {
   mocks.isLoading = false;
   mocks.error = null;
   mocks.buttons = [];
+  mocks.storageResult = undefined;
+  mocks.storageError = null;
+  mocks.storageCheck.mockResolvedValue(undefined);
 });
 
 afterEach(() => {
@@ -299,5 +308,34 @@ describe("admin narrator auditions offline UI", () => {
     expect(appSource).toContain(
       '<Route path={"/admin-login"} component={AdminLogin} />'
     );
+  });
+
+  it("offers an explicit storage check with no credit checkbox or voice generation required", async () => {
+    const html = renderPage();
+    expect(html).toContain("Check sample storage");
+    expect(html).toContain("It does not generate speech, use voice credits");
+    expect(mocks.storageCheck).not.toHaveBeenCalled();
+    const button = mocks.buttons.find(button => button["aria-label"] === "Check sample storage");
+    expect(button.disabled).toBe(false);
+    await button.onClick();
+    expect(mocks.storageCheck).toHaveBeenCalledOnce();
+    expect(mocks.audition).not.toHaveBeenCalled();
+  });
+
+  it("displays safe diagnostic phase and reason, never a raw mutation error", () => {
+    mocks.storageResult = { ok: false, stage: "cache-read", reason: "AccessDenied", message: "Storage access was denied.", providerKeyConfigured: true };
+    mocks.storageError = new Error("SECRET_RAW_PAYLOAD");
+    const html = renderPage();
+    expect(html).toContain("Storage check failed");
+    expect(html).toContain("cache-read");
+    expect(html).toContain("AccessDenied");
+    expect(html).toContain("No speech was requested");
+    expect(html).not.toContain("SECRET_RAW_PAYLOAD");
+  });
+
+  it("preserves allowlisted backend storage errors without exposing arbitrary provider messages", () => {
+    expect(safePreparationError({ data: { code: "PRECONDITION_FAILED" }, message: "Private narrator audition storage is unavailable. Please try again later." })).toContain("Check sample storage");
+    expect(safePreparationError({ data: { code: "PRECONDITION_FAILED" }, message: "SECRET_KEY?token=secret" })).not.toContain("SECRET_KEY");
+    expect(safePreparationError({ data: { code: "INTERNAL_SERVER_ERROR" }, message: "Private narrator audition storage is unavailable. Please try again later." })).not.toContain("Check sample storage");
   });
 });

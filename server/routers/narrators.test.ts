@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TrpcContext } from "../_core/context";
 import { NARRATOR_AUDITION_TEXT } from "../../shared/narratorAuditions";
 
-const mocks = vi.hoisted(() => ({ audition: vi.fn() }));
+const mocks = vi.hoisted(() => ({ audition: vi.fn(), storageCheck: vi.fn() }));
 vi.mock("../services/narratorAuditions", () => {
   class NarratorAuditionError extends Error {
     constructor(public code: string) {
@@ -11,7 +11,7 @@ vi.mock("../services/narratorAuditions", () => {
         : "This native narrator audition is unavailable. No substitute voice or model was used.");
     }
   }
-  return { getNarratorAudition: mocks.audition, NarratorAuditionError };
+  return { getNarratorAudition: mocks.audition, checkNarratorAuditionStorage: mocks.storageCheck, NarratorAuditionError };
 });
 import { narratorsRouter } from "./narrators";
 import { NarratorAuditionError } from "../services/narratorAuditions";
@@ -33,7 +33,9 @@ describe("native narrator audition API", () => {
     const caller = narratorsRouter.createCaller(context(role));
     await expect(caller.listAuditions()).rejects.toBeInstanceOf(Error);
     await expect(caller.audition({ presetId: "playful", confirmCredits: true })).rejects.toBeInstanceOf(Error);
+    await expect(caller.checkStorage()).rejects.toBeInstanceOf(Error);
     expect(mocks.audition).not.toHaveBeenCalled();
+    expect(mocks.storageCheck).not.toHaveBeenCalled();
   });
   it("lists the fixed recipe without generating speech", async () => {
     const result = await narratorsRouter.createCaller(context("admin")).listAuditions();
@@ -67,5 +69,17 @@ describe("native narrator audition API", () => {
   it("does not expose unexpected provider or credential details", async () => {
     mocks.audition.mockRejectedValueOnce(new Error("SECRET_PROVIDER_PAYLOAD"));
     await expect(narratorsRouter.createCaller(context("admin")).audition({ presetId: "playful", confirmCredits: true })).rejects.toMatchObject({ code: "INTERNAL_SERVER_ERROR", message: "The narrator audition could not be prepared. Check the staging voice and storage settings." });
+  });
+  it("runs a storage check only for an admin without invoking voice generation", async () => {
+    const result = { ok: false, stage: "cache-read", reason: "AccessDenied", message: "Storage access was denied.", providerKeyConfigured: true };
+    mocks.storageCheck.mockResolvedValueOnce(result);
+    expect(await narratorsRouter.createCaller(context("admin")).checkStorage()).toEqual(result);
+    expect(mocks.storageCheck).toHaveBeenCalledOnce();
+    expect(mocks.audition).not.toHaveBeenCalled();
+  });
+  it("hides unexpected diagnostic transport details", async () => {
+    mocks.storageCheck.mockRejectedValueOnce(new Error("SECRET_STORAGE_PAYLOAD"));
+    await expect(narratorsRouter.createCaller(context("admin")).checkStorage()).rejects.toMatchObject({ code: "INTERNAL_SERVER_ERROR", message: "The sample storage check could not finish. No speech was requested." });
+    expect(mocks.audition).not.toHaveBeenCalled();
   });
 });

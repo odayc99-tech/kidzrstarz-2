@@ -43,6 +43,7 @@ import {
   type NarratorAuditionId,
 } from "@shared/narratorAuditions";
 import {
+  checkNarratorAuditionStorage,
   getNarratorAudition,
   NarratorAuditionError,
 } from "./narratorAuditions";
@@ -188,7 +189,13 @@ beforeEach(() => {
 
 afterEach(() => {
   expect(console.log).not.toHaveBeenCalled();
-  expect(console.warn).not.toHaveBeenCalled();
+  expect(vi.mocked(console.warn).mock.calls.length).toBeLessThanOrEqual(1);
+  for (const args of vi.mocked(console.warn).mock.calls) {
+    expect(args).toHaveLength(1);
+    expect(args[0]).toMatch(
+      /^\[NarratorAudition\] (playful|warm|bedtime) (BUSY|UNAVAILABLE|INVALID_AUDIO|STORAGE) stage=(config|cache-read|acquire|lease-verify|provider|upload|sign|release) reason=(AccessDenied|InvalidAccessKeyId|SignatureDoesNotMatch|NoSuchBucket|PermanentRedirect|AuthorizationHeaderMalformed|PreconditionFailed|ConditionalRequestConflict|AbortError|TimeoutError|BUSY|INVALID_AUDIO|STORAGE|MissingConfiguration|UnexpectedStorageResponse)$/
+    );
+  }
   expect(console.error).not.toHaveBeenCalled();
   vi.useRealTimers();
   vi.restoreAllMocks();
@@ -716,4 +723,455 @@ describe("conditional lease ownership and bounded failures", () => {
     expect(objects.has(address("offline-bucket", clipKey()))).toBe(false);
     expect(leaseValue().expiresAt).toBe(0);
   });
+});
+
+const diagnosticLeaseKey =
+  "kidzrstarz/narrator-auditions/v1/storage-check.lease.json";
+const safeReasons = [
+  "AccessDenied",
+  "InvalidAccessKeyId",
+  "SignatureDoesNotMatch",
+  "NoSuchBucket",
+  "PermanentRedirect",
+  "AuthorizationHeaderMalformed",
+  "PreconditionFailed",
+  "ConditionalRequestConflict",
+  "AbortError",
+  "TimeoutError",
+  "BUSY",
+  "INVALID_AUDIO",
+  "STORAGE",
+  "MissingConfiguration",
+  "UnexpectedStorageResponse",
+];
+function seedDiagnosticLease(expiresAt: number, token = TOKEN): Stored {
+  return store(
+    diagnosticLeaseKey,
+    Buffer.from(JSON.stringify({ version: 1, token, expiresAt })),
+    "application/json"
+  );
+}
+
+describe("storage-only audition diagnostics (entirely offline)", () => {
+  afterEach(() => {
+    expect(mocks.post).not.toHaveBeenCalled();
+    expect(mocks.sign).not.toHaveBeenCalled();
+    expect(console.warn).not.toHaveBeenCalled();
+    for (const [command, options] of mocks.send.mock.calls as [
+      Command,
+      { abortSignal: AbortSignal },
+    ][]) {
+      expect(options.abortSignal).toBeInstanceOf(AbortSignal);
+      expect(command.input.Bucket).toBe("offline-bucket");
+      expect(command.input).not.toHaveProperty("ACL");
+      if (command.kind === "put") {
+        expect(command.input.Key).toBe(diagnosticLeaseKey);
+        expect(command.input.ContentType).toBe("application/json");
+        expect(
+          command.input.IfNoneMatch === "*" || Boolean(command.input.IfMatch)
+        ).toBe(true);
+      } else {
+        expect([clipKey("playful"), diagnosticLeaseKey]).toContain(
+          command.input.Key
+        );
+      }
+    }
+    if (mocks.client.mock.calls.length) {
+      expect(mocks.client).toHaveBeenCalledOnce();
+      expect(mocks.client).toHaveBeenCalledWith({
+        region: "offline-region",
+        credentials: {
+          accessKeyId: "offline-access",
+          secretAccessKey: "offline-secret",
+        },
+        maxAttempts: 1,
+      });
+      expect(mocks.destroy).toHaveBeenCalledOnce();
+    }
+  });
+
+  it.each([false, true])(
+    "checks the actual first Jade cache, whether present=%s, and CAS releases only the diagnostic lease",
+    async present => {
+      if (present) store(clipKey(), audio());
+      const result = await checkNarratorAuditionStorage();
+      expect(result).toMatchObject({
+        ok: true,
+        stage: "complete",
+        reason: "STORAGE",
+        providerKeyConfigured: true,
+      });
+      expect(result.message).toContain("No provider request was made");
+      expect(
+        mocks.send.mock.calls.map(([command]) => [
+          command.kind,
+          command.input.Key,
+        ])
+      ).toEqual([
+        ["get", clipKey()],
+        ["put", diagnosticLeaseKey],
+        ["get", diagnosticLeaseKey],
+        ["put", diagnosticLeaseKey],
+      ]);
+      const writes = puts(true);
+      expect(writes).toHaveLength(2);
+      expect(writes[0].IfNoneMatch).toBe("*");
+      expect(writes[1].IfMatch).toBe(present ? '"revision-2"' : '"revision-1"');
+      const acquired = JSON.parse(writes[0].Body!.toString());
+      expect(JSON.parse(writes[1].Body!.toString())).toEqual({
+        ...acquired,
+        expiresAt: 0,
+      });
+      expect(objects.get(address("offline-bucket", clipKey()))?.bytes).toEqual(
+        present ? audio() : undefined
+      );
+    }
+  );
+
+  it("requires no provider key and reuses an expired diagnostic marker with bounded CAS", async () => {
+    vi.stubEnv("ELEVENLABS_API_KEY", "");
+    const old = seedDiagnosticLease(NOW - 6_000);
+    await expect(checkNarratorAuditionStorage()).resolves.toMatchObject({
+      ok: true,
+      providerKeyConfigured: false,
+    });
+    expect(puts(true)).toHaveLength(3);
+    expect(puts(true)[1].IfMatch).toBe(old.etag);
+    expect(puts(true)[2].IfMatch).not.toBe(old.etag);
+  });
+
+  it.each([
+    ["S3_BUCKET"],
+    ["S3_REGION"],
+    ["AWS_ACCESS_KEY_ID"],
+    ["AWS_SECRET_ACCESS_KEY"],
+    ["S3_BUCKET", "S3_REGION", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"],
+  ])(
+    "reports only missing variable names without creating a client: %s",
+    async (...names) => {
+      for (const name of names) vi.stubEnv(name, "");
+      const result = await checkNarratorAuditionStorage();
+      expect(result).toEqual({
+        ok: false,
+        stage: "config",
+        reason: "MissingConfiguration",
+        providerKeyConfigured: true,
+        message: `Missing S3 configuration: ${names.join(", ")}.`,
+      });
+      expect(JSON.stringify(result)).not.toMatch(
+        /offline-|secret|signed|signature=/
+      );
+      expect(mocks.client).not.toHaveBeenCalled();
+      expect(mocks.send).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([
+    "AccessDenied",
+    "InvalidAccessKeyId",
+    "SignatureDoesNotMatch",
+    "NoSuchBucket",
+    "PermanentRedirect",
+    "AuthorizationHeaderMalformed",
+    "PreconditionFailed",
+    "ConditionalRequestConflict",
+    "AbortError",
+    "TimeoutError",
+  ])(
+    "preserves the allowlisted cache failure %s without any writes or raw error exposure",
+    async name => {
+      mocks.send.mockRejectedValue(
+        Object.assign(s3Error(name, 403), {
+          message:
+            "PRIVATE offline-access offline-secret https://credential.invalid/customer-object",
+          config: { key: "offline-provider-secret" },
+        })
+      );
+      const result = await checkNarratorAuditionStorage();
+      expect(result).toMatchObject({
+        ok: false,
+        stage: "cache-read",
+        reason: name,
+      });
+      expect(safeReasons).toContain(result.reason);
+      expect(JSON.stringify(result)).not.toMatch(
+        /PRIVATE|offline-|https:|customer-object|credential.invalid/
+      );
+      expect(mocks.send).toHaveBeenCalledOnce();
+      expect(puts(true)).toHaveLength(0);
+    }
+  );
+
+  it.each([
+    { Code: "AccessDenied", expected: "AccessDenied" },
+    { code: "InvalidAccessKeyId", expected: "InvalidAccessKeyId" },
+    { $metadata: { httpStatusCode: 412 }, expected: "PreconditionFailed" },
+    {
+      $metadata: { httpStatusCode: 409 },
+      expected: "ConditionalRequestConflict",
+    },
+    { $metadata: { httpStatusCode: 404 }, expected: "STORAGE" },
+    {
+      name: "https://PRIVATE.invalid/secret",
+      code: "RAW_SECRET",
+      expected: "STORAGE",
+    },
+  ])(
+    "sanitizes actual S3 code/status variants: $expected",
+    async ({ expected, ...error }) => {
+      mocks.send.mockRejectedValue(
+        Object.assign(new Error("RAW_SECRET private credentials"), error)
+      );
+      const result = await checkNarratorAuditionStorage();
+      expect(result).toMatchObject({
+        ok: false,
+        stage: "cache-read",
+        reason: expected,
+      });
+      expect(safeReasons).toContain(result.reason);
+      expect(JSON.stringify(result)).not.toMatch(
+        /RAW_SECRET|PRIVATE|https:|private credentials/
+      );
+      expect(puts(true)).toHaveLength(0);
+    }
+  );
+
+  it.each([
+    new Error("PRIVATE unknown SDK payload"),
+    "PRIVATE credential string",
+    null,
+    undefined,
+  ])(
+    "unknown raw failures cannot leak or become cache absence (%s)",
+    async error => {
+      mocks.send.mockRejectedValue(error);
+      const result = await checkNarratorAuditionStorage();
+      expect(result).toMatchObject({
+        ok: false,
+        stage: "cache-read",
+        reason: "STORAGE",
+      });
+      expect(JSON.stringify(result)).not.toMatch(
+        /PRIVATE|SDK payload|credential string/
+      );
+      expect(puts(true)).toHaveLength(0);
+    }
+  );
+
+  it("stops at corrupt cached audio without writing or attempting a repair", async () => {
+    store(clipKey(), Buffer.from("ID3 PRIVATE broken audio"));
+    await expect(checkNarratorAuditionStorage()).resolves.toMatchObject({
+      ok: false,
+      stage: "cache-read",
+      reason: "INVALID_AUDIO",
+    });
+    expect(puts(true)).toHaveLength(0);
+  });
+
+  it.each([
+    undefined,
+    {},
+    {
+      Body: Readable.from([audio()]),
+      ContentLength: 1,
+      ContentType: "audio/mpeg",
+    },
+  ])(
+    "fails safely on unexpected/incomplete cache responses (%s)",
+    async response => {
+      // A short ContentLength does not bypass full streamed validation; a valid body remains valid.
+      mocks.send.mockResolvedValueOnce(response);
+      const result = await checkNarratorAuditionStorage();
+      if (response?.Body) expect(result.ok).toBe(true);
+      else
+        expect(result).toMatchObject({
+          ok: false,
+          stage: "cache-read",
+          reason: "UnexpectedStorageResponse",
+        });
+    }
+  );
+
+  it("distinguishes a denied diagnostic lease acquisition from a cache denial", async () => {
+    intercept = command =>
+      command.kind === "put"
+        ? Promise.reject(s3Error("AccessDenied", 403))
+        : undefined;
+    await expect(checkNarratorAuditionStorage()).resolves.toMatchObject({
+      ok: false,
+      stage: "acquire",
+      reason: "AccessDenied",
+    });
+    expect(puts(true)).toHaveLength(1);
+  });
+
+  it("reports a live diagnostic lease as BUSY without replacing it or touching a voice lease", async () => {
+    seedDiagnosticLease(NOW + 300_000);
+    const before = objects.get(address("offline-bucket", diagnosticLeaseKey));
+    await expect(checkNarratorAuditionStorage()).resolves.toMatchObject({
+      ok: false,
+      stage: "acquire",
+      reason: "BUSY",
+    });
+    expect(puts(true)).toHaveLength(1);
+    expect(objects.get(address("offline-bucket", diagnosticLeaseKey))).toBe(
+      before
+    );
+  });
+
+  it.each(["AccessDenied", "NoSuchKey", "AbortError"])(
+    "reports read ownership failure at lease-verify (%s) and attempts only owned CAS cleanup",
+    async reason => {
+      intercept = command =>
+        command.kind === "get" && command.input.Key === diagnosticLeaseKey
+          ? Promise.reject(
+              s3Error(reason, reason === "AccessDenied" ? 403 : 404)
+            )
+          : undefined;
+      await expect(checkNarratorAuditionStorage()).resolves.toMatchObject({
+        ok: false,
+        stage: "lease-verify",
+        reason: reason === "NoSuchKey" ? "BUSY" : reason,
+      });
+      expect(puts(true)).toHaveLength(2);
+      expect(puts(true)[1].IfMatch).toBe('"revision-1"');
+    }
+  );
+
+  it("ownership replacement is BUSY and failed cleanup cannot clobber the new owner or mask the phase", async () => {
+    intercept = command => {
+      if (command.kind === "put" && command.input.IfNoneMatch)
+        return memoryS3(command).then(result => {
+          seedDiagnosticLease(NOW + 300_000, OTHER_TOKEN);
+          return result;
+        });
+    };
+    await expect(checkNarratorAuditionStorage()).resolves.toMatchObject({
+      ok: false,
+      stage: "lease-verify",
+      reason: "BUSY",
+    });
+    const current = JSON.parse(
+      objects
+        .get(address("offline-bucket", diagnosticLeaseKey))!
+        .bytes.toString()
+    );
+    expect(current).toMatchObject({
+      token: OTHER_TOKEN,
+      expiresAt: NOW + 300_000,
+    });
+    expect(puts(true)).toHaveLength(2);
+  });
+
+  it.each([
+    "AccessDenied",
+    "PreconditionFailed",
+    "ConditionalRequestConflict",
+    "PRIVATE_UNKNOWN",
+  ])(
+    "does not claim success when diagnostic CAS release fails (%s)",
+    async reason => {
+      intercept = command =>
+        command.kind === "put" && command.input.IfMatch
+          ? Promise.reject(
+              s3Error(reason, reason === "PreconditionFailed" ? 412 : undefined)
+            )
+          : undefined;
+      const result = await checkNarratorAuditionStorage();
+      expect(result).toMatchObject({
+        ok: false,
+        stage: "release",
+        reason: reason === "PRIVATE_UNKNOWN" ? "STORAGE" : reason,
+      });
+      expect(safeReasons).toContain(result.reason);
+      expect(JSON.stringify(result)).not.toContain("PRIVATE_UNKNOWN");
+      expect(puts(true)).toHaveLength(2);
+    }
+  );
+
+  it("rejects a missing acquired ETag with no unsafe release", async () => {
+    intercept = command =>
+      command.kind === "put" ? memoryS3(command).then(() => ({})) : undefined;
+    await expect(checkNarratorAuditionStorage()).resolves.toMatchObject({
+      ok: false,
+      stage: "acquire",
+      reason: "UnexpectedStorageResponse",
+    });
+    expect(puts(true)).toHaveLength(1);
+  });
+
+  it("rejects a malformed existing diagnostic lease rather than taking it over", async () => {
+    store(
+      diagnosticLeaseKey,
+      Buffer.from("PRIVATE invalid JSON"),
+      "application/json"
+    );
+    const result = await checkNarratorAuditionStorage();
+    expect(result).toMatchObject({
+      ok: false,
+      stage: "acquire",
+      reason: "UnexpectedStorageResponse",
+    });
+    expect(result.message).not.toContain("PRIVATE");
+    expect(puts(true)).toHaveLength(1);
+  });
+
+  it("bounds cache stream reads and reports the timeout at cache-read before writes", async () => {
+    vi.useFakeTimers();
+    mocks.send.mockResolvedValueOnce({
+      ContentType: "audio/mpeg",
+      Body: {
+        async *[Symbol.asyncIterator]() {
+          await new Promise(() => {});
+        },
+      },
+    });
+    const pending = checkNarratorAuditionStorage();
+    await vi.advanceTimersByTimeAsync(30_000);
+    await expect(pending).resolves.toMatchObject({
+      ok: false,
+      stage: "cache-read",
+      reason: "TimeoutError",
+    });
+    expect(puts(true)).toHaveLength(0);
+  });
+});
+
+describe("safe real audition failure observability", () => {
+  it("retains the cache AWS reason, logs only fixed alias/code/phase/reason, and rate-limits repeated failures", async () => {
+    now += 600_000;
+    mocks.send.mockRejectedValue(
+      Object.assign(s3Error("AccessDenied", 403), {
+        message:
+          "PRIVATE offline-secret https://private.invalid/customer-object",
+      })
+    );
+    const error = await getNarratorAudition("playful").catch(error => error);
+    expect(error).toMatchObject({ code: "STORAGE" });
+    expect(JSON.stringify(error)).not.toMatch(
+      /PRIVATE|offline-|https:|customer-object|AccessDenied/
+    );
+    expect(console.warn).toHaveBeenCalledWith(
+      "[NarratorAudition] playful STORAGE stage=cache-read reason=AccessDenied"
+    );
+    await expect(getNarratorAudition("playful")).rejects.toMatchObject({
+      code: "STORAGE",
+    });
+    expect(console.warn).toHaveBeenCalledOnce();
+    expect(mocks.post).not.toHaveBeenCalled();
+  });
+});
+
+it("a null cache response is unexpected storage data, never explicit absence", async () => {
+  mocks.send.mockResolvedValueOnce(null);
+  await expect(checkNarratorAuditionStorage()).resolves.toMatchObject({
+    ok: false,
+    stage: "cache-read",
+    reason: "UnexpectedStorageResponse",
+  });
+  expect(mocks.send).toHaveBeenCalledOnce();
+  expect(puts(true)).toHaveLength(0);
+  expect(mocks.post).not.toHaveBeenCalled();
+  expect(mocks.sign).not.toHaveBeenCalled();
+  expect(mocks.destroy).toHaveBeenCalledOnce();
 });
