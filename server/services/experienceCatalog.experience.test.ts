@@ -190,7 +190,7 @@ describe("experience catalog private S3 persistence", () => {
     ]);
     expect(publicCatalog.themes.every(theme => !("storySetting" in theme) && !("storyTone" in theme))).toBe(true);
     expect(publicCatalog.themes[0]).not.toHaveProperty("published");
-    expect(publicCatalog.music.map(preset => preset.available)).toEqual([false, false, false]);
+    expect(publicCatalog.music.map(preset => preset.available)).toEqual([true, true, true]);
 
     const document = storedJson(EXPERIENCE_CATALOG_KEY);
     expect(document.themes).toHaveLength(8);
@@ -284,11 +284,22 @@ describe("experience catalog private S3 persistence", () => {
 
   it("writes immutable snapshots, returns defensive copies, and permits only true missing sidecars to use legacy null", async () => {
     const snapshot = await resolveNewOrderExperience("adventure");
-    expect(snapshot.music).toBeNull();
+    expect(snapshot.music).toMatchObject({
+      id: "playful-adventure",
+      label: "Playful Adventure",
+      assetPath: "/audio/kidzrstarz/playful-adventure-v1.mp3",
+    });
     await expect(resolveNewOrderExperience("adventure", "none")).resolves.toMatchObject({ music: null });
-    await expect(resolveNewOrderExperience("adventure", "playful-adventure")).rejects.toThrow(
-      "selected music preset is unavailable"
-    );
+    const preset = MUSIC_PRESETS.find(item => item.id === "playful-adventure")!;
+    const previous = preset.available;
+    try {
+      preset.available = false;
+      await expect(resolveNewOrderExperience("adventure", "playful-adventure")).rejects.toThrow(
+        "selected music preset is unavailable"
+      );
+    } finally {
+      preset.available = previous;
+    }
     const originalKey = "guest-example/originals/photo-original.jpg";
 
     await saveOrderExperience(originalKey, snapshot);

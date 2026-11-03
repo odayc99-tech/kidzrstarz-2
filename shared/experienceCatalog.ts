@@ -47,8 +47,8 @@ export interface MusicPreset {
 }
 
 /**
- * These asset paths are server-controlled and versioned. They remain unavailable
- * until an approved, licensed asset source is supplied and enabled deliberately.
+ * These approved original instrumental assets are bundled and versioned.
+ * Retain earlier versions so existing frozen order soundtracks remain valid.
  */
 export const MUSIC_PRESETS: readonly MusicPreset[] = [
   {
@@ -56,21 +56,21 @@ export const MUSIC_PRESETS: readonly MusicPreset[] = [
     label: "Playful Adventure",
     description: "A bright, bouncy instrumental for joyful discoveries.",
     assetPath: "/audio/kidzrstarz/playful-adventure-v1.mp3",
-    available: false,
+    available: true,
   },
   {
     id: "magical-wonder",
     label: "Magical Wonder",
     description: "A gentle, sparkling instrumental for enchanted moments.",
     assetPath: "/audio/kidzrstarz/magical-wonder-v1.mp3",
-    available: false,
+    available: true,
   },
   {
     id: "cozy-bedtime",
     label: "Cozy Bedtime",
     description: "A soft, calming instrumental for a warm ending.",
     assetPath: "/audio/kidzrstarz/cozy-bedtime-v1.mp3",
-    available: false,
+    available: true,
   },
 ] as const;
 
