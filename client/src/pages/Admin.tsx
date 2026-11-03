@@ -229,6 +229,15 @@ export default function AdminPage() {
                 Themes
               </Button>
             </Link>
+            <Link href="/admin/narrators">
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-purple-200 text-purple-700 hover:bg-purple-50"
+              >
+                Narrators
+              </Button>
+            </Link>
             <Button
               variant="outline"
               size="sm"

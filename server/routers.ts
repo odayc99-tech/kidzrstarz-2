@@ -6,6 +6,7 @@ import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
 import { ordersRouter } from "./routers/orders";
 import { themesRouter } from "./routers/themes";
+import { narratorsRouter } from "./routers/narrators";
 import { sdk } from "./_core/sdk";
 import { ENV } from "./_core/env";
 import * as db from "./db";
@@ -64,6 +65,7 @@ export const appRouter = router({
 
   orders: ordersRouter,
   themes: themesRouter,
+  narrators: narratorsRouter,
 });
 
 export type AppRouter = typeof appRouter;

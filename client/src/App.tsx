@@ -14,6 +14,7 @@ import GuestOrders from "./pages/GuestOrders";
 import Admin from "./pages/Admin";
 import AdminLogin from "./pages/AdminLogin";
 import AdminThemes from "./pages/AdminThemes";
+import AdminNarrators from "./pages/AdminNarrators";
 
 function Router() {
   return (
@@ -27,6 +28,7 @@ function Router() {
       <Route path={"/share/:token"} component={SharedStorybook} />
       <Route path={"/admin"} component={Admin} />
       <Route path={"/admin/themes"} component={AdminThemes} />
+      <Route path={"/admin/narrators"} component={AdminNarrators} />
       <Route path={"/admin-login"} component={AdminLogin} />
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}
