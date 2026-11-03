@@ -160,7 +160,16 @@ function storageClient(expected: Config): S3Client {
 
 function configIdentity(value: Config): string {
   // Isolate overlapping work by storage destination AND credentials, without keeping secrets in map keys.
-  return createHash("sha256").update(JSON.stringify(value)).digest("hex");
+  // The real SDK annotates static credentials (for example with $source) after signing.
+  // Those internal fields are not a credential change and must not invalidate the next check.
+  return createHash("sha256")
+    .update(JSON.stringify([
+      value.bucket,
+      value.region,
+      value.credentials.accessKeyId,
+      value.credentials.secretAccessKey,
+    ]))
+    .digest("hex");
 }
 
 function checkConfig(expected: Config): void {

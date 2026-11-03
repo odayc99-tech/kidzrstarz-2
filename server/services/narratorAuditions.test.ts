@@ -1175,3 +1175,49 @@ it("a null cache response is unexpected storage data, never explicit absence", a
   expect(mocks.sign).not.toHaveBeenCalled();
   expect(mocks.destroy).toHaveBeenCalledOnce();
 });
+
+
+describe("SDK credential metadata must not masquerade as a configuration change", () => {
+  function annotateAfterFirstCacheRead() {
+    let annotated = false;
+    intercept = command => {
+      if (!annotated && command.kind === "get" && command.input.Key === clipKey()) {
+        annotated = true;
+        const options = mocks.client.mock.calls[0][0] as { credentials: Record<string, unknown> };
+        // Actual AWS SDK signing adds this enumerable bookkeeping field to static credentials.
+        options.credentials.$source = { CREDENTIALS_CODE: "e" };
+      }
+      return undefined;
+    };
+  }
+
+  it("completes the credit-free diagnostic after the SDK annotates static credentials", async () => {
+    annotateAfterFirstCacheRead();
+    await expect(checkNarratorAuditionStorage()).resolves.toMatchObject({ ok: true, stage: "complete" });
+    expect(mocks.post).not.toHaveBeenCalled();
+    expect(mocks.sign).not.toHaveBeenCalled();
+    expect(puts(true)).toHaveLength(2);
+  });
+
+  it("can prepare and cache a confirmed sample despite SDK bookkeeping fields", async () => {
+    annotateAfterFirstCacheRead();
+    await expect(getNarratorAudition("playful")).resolves.toMatchObject({ fromCache: false });
+    await expect(getNarratorAudition("playful")).resolves.toMatchObject({ fromCache: true });
+    expect(mocks.post).toHaveBeenCalledOnce();
+    expect(leaseValue().expiresAt).toBe(0);
+  });
+
+  it.each(["S3_BUCKET", "S3_REGION", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"])(
+    "still blocks actual %s changes before any voice request",
+    async name => {
+      intercept = command => {
+        if (command.kind === "get" && command.input.Key === clipKey()) vi.stubEnv(name, "changed-offline-value");
+        return undefined;
+      };
+      await expect(checkNarratorAuditionStorage()).resolves.toMatchObject({ ok: false, stage: "acquire", reason: "STORAGE" });
+      expect(puts(true)).toHaveLength(0);
+      expect(mocks.post).not.toHaveBeenCalled();
+      expect(mocks.sign).not.toHaveBeenCalled();
+    }
+  );
+});
